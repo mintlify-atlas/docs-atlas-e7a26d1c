@@ -1,0 +1,123 @@
+{
+  "projectType": "framework",
+  "projectName": "Debentialc",
+  "projectDescription": "A comprehensive Minecraft server plugin providing boosters, custom items, raids, and territory management systems",
+  "theme": "aspen",
+  "primaryColor": "#2ECC40",
+  "lightColor": "#7FDBFF",
+  "darkColor": "#0074D9",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "configuration",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Systems",
+            "pages": [
+              "systems/boosters",
+              "systems/custom-items",
+              "systems/raids",
+              "systems/claims"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/boosters-setup",
+              "guides/creating-custom-items",
+              "guides/raid-configuration",
+              "guides/territory-management"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Commands",
+            "pages": [
+              "api/commands/booster",
+              "api/commands/customitem",
+              "api/commands/raid",
+              "api/commands/terrain",
+              "api/commands/lease"
+            ]
+          },
+          {
+            "group": "Managers & Core",
+            "pages": [
+              "api/managers/booster-manager",
+              "api/managers/raid-manager",
+              "api/managers/terrain-manager",
+              "api/integration/placeholders"
+            ]
+          },
+          {
+            "group": "Models & Events",
+            "pages": [
+              "api/models/boosters",
+              "api/models/custom-items",
+              "api/models/raids",
+              "api/events/overview"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Advanced",
+        "groups": [
+          {
+            "group": "Configuration",
+            "pages": [
+              "advanced/permissions",
+              "advanced/placeholders",
+              "advanced/storage"
+            ]
+          },
+          {
+            "group": "Support",
+            "pages": [
+              "advanced/troubleshooting",
+              "advanced/faq"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Global and personal XP/multiplier booster system",
+    "Custom item creation with stat bonuses and special effects",
+    "NPC-based raid system with party support and cooldowns",
+    "Territory claiming, leasing, and environmental customization",
+    "PlaceholderAPI integration for placeholders",
+    "Vault economy integration for claims and leasing"
+  ],
+  "publicApiSurface": [
+    "/booster - Global booster management",
+    "/tpbooster - Personal booster management",
+    "/givetps - Give TP boosters to players",
+    "/customitem (ci) - Custom item creation and management",
+    "/raid - Raid configuration and management",
+    "/party - Party system for raids",
+    "/terrain - Territory management",
+    "/lease - Territory leasing system",
+    "BoosterModule.initialize() - Initialize booster system",
+    "GlobalBoosterManager - Global booster API",
+    "PersonalBoosterManager - Personal booster API",
+    "RaidStorageManager - Raid data management",
+    "TerrainManager - Territory management API",
+    "LeaseManager - Lease management API",
+    "BoosterPlaceholder - PlaceholderAPI expansion"
+  ]
+}
