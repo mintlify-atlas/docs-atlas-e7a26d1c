@@ -1,80 +1,690 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start Guide
+description: Get started with Debentialc - learn essential commands, workflows, and practical examples for all modules
 ---
 
-## Get started in three steps
+# Quick Start Guide
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This guide will get you up and running with Debentialc's four major systems: Boosters, Custom Items, Raids, and Territory Claims.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Ensure you've completed [Installation](/installation) before proceeding.
 </Note>
+
+## Basic Workflow
+
+<Steps>
+  <Step title="Verify Installation">
+    Check that Debentialc is loaded:
+    ```bash
+    /plugins
+    ```
+    Look for **Debentialc** in green.
+  </Step>
+  
+  <Step title="Check Permissions">
+    Ensure you have admin permissions:
+    ```bash
+    /lp user <your_name> permission set debentialc.* true
+    ```
+    Or use your permissions plugin's equivalent.
+  </Step>
+  
+  <Step title="Explore Help Commands">
+    ```bash
+    /booster help
+    /ci help
+    /terrain help
+    /raid help
+    ```
+  </Step>
+</Steps>
+
+## Booster System Quick Start
+
+The booster system provides global and personal multipliers for gameplay bonuses.
+
+### Activating a Global Booster
+
+<CodeGroup>
+```bash Admin Commands
+# Activate 50% bonus for 1 hour
+/booster global activate 50% 1h
+
+# Activate 150% bonus for 2.5 hours
+/booster global activate 150% 2h30m
+
+# Check active booster
+/booster global info
+
+# Deactivate early
+/booster global deactivate
+```
+
+```java Programmatic Activation
+import org.debentialc.boosters.managers.GlobalBoosterManager;
+import org.bukkit.Bukkit;
+
+// Activate 2.5x global booster for 1 hour
+GlobalBoosterManager.activateBooster(2.5, "AdminName", 3600);
+
+// Broadcast to all players
+Bukkit.broadcastMessage("§6§lBOOSTER ACTIVATED: 2.5x for 1 hour!");
+```
+</CodeGroup>
+
+See BoosterCommand.java:77-125 for implementation details.
+
+### Giving Personal Boosters
+
+<Steps>
+  <Step title="Give Booster to Player">
+    ```bash
+    /booster personal add <player> <level>
+    ```
+    Example:
+    ```bash
+    /booster personal add Steve 3
+    ```
+    
+    Levels 1-5 (configured in BoosterSettings):
+    - Level 1: +15% bonus
+    - Level 2: +30% bonus
+    - Level 3: +60% bonus
+    - Level 4: +120% bonus
+    - Level 5: +250% bonus
+  </Step>
+  
+  <Step title="Player Activates Booster">
+    Player runs:
+    ```bash
+    /booster personal list
+    /booster personal activate 0
+    ```
+    
+    The index (0, 1, 2...) corresponds to the booster in their inventory.
+  </Step>
+  
+  <Step title="Check Combined Multiplier">
+    ```bash
+    /booster info
+    ```
+    
+    Shows both global and personal boosters active.
+  </Step>
+</Steps>
+
+See BoosterCommand.java:159-282 for personal booster logic.
+
+### Using Boosters in Your Code
+
+```java
+import org.debentialc.boosters.core.BoosterUtils;
+import org.bukkit.entity.Player;
+
+public void applyBoosterToReward(Player player, double baseReward) {
+    // Get combined multiplier (global + personal + rank)
+    double multiplier = BoosterUtils.calculateCombinedMultiplier(player.getUniqueId());
+    
+    // Apply to calculation
+    double finalReward = baseReward * multiplier;
+    
+    player.sendMessage("§aBase reward: " + baseReward);
+    player.sendMessage("§eMultiplier: " + BoosterUtils.formatMultiplier(multiplier));
+    player.sendMessage("§6Final reward: " + finalReward);
+}
+```
+
+See Main.java:224-231 for example usage.
+
+## Custom Items Quick Start
+
+Create powerful custom items with stats, effects, and bonuses.
+
+### Creating Your First Custom Item
+
+<Steps>
+  <Step title="Hold Base Item">
+    Hold a diamond sword in your hand (or any item).
+  </Step>
+  
+  <Step title="Rename and Add Lore">
+    Use an anvil or commands:
+    ```bash
+    /ci create my_sword
+    /ci rename §6§lLegendary Blade
+    /ci addline §7A weapon of immense power
+    /ci addline §a+50 Strength | +25% Dexterity
+    ```
+  </Step>
+  
+  <Step title="Add Stat Bonuses">
+    ```bash
+    # Add +50 flat strength
+    /ci plus my_sword 50 str
+    
+    # Add +25% dexterity multiplier
+    /ci percentage my_sword 0.25 dex
+    
+    # Add -10 willpower penalty
+    /ci less my_sword 10 will
+    ```
+  </Step>
+  
+  <Step title="Add Special Effects">
+    ```bash
+    # 5% health regeneration per tick
+    /ci effect HEALTHREGEN 0.05
+    
+    # 3% ki regeneration
+    /ci effect KIREGEN 0.03
+    ```
+  </Step>
+  
+  <Step title="Give to Players">
+    ```bash
+    /ci give my_sword PlayerName 1
+    ```
+  </Step>
+</Steps>
+
+See CustomItemCommand.java:69-116 for implementation.
+
+### Custom Item Examples
+
+<Tabs>
+  <Tab title="Warrior Sword">
+    ```bash
+    # Hold diamond sword, then:
+    /ci create warrior_blade
+    /ci rename §c§lWarrior's Blade
+    /ci addline §7Forged in the fires of battle
+    /ci addline §c+100 Strength
+    /ci addline §6+50% Constitution
+    /ci plus warrior_blade 100 str
+    /ci percentage warrior_blade 0.50 con
+    /ci effect HEALTHREGEN 0.08
+    ```
+  </Tab>
+  
+  <Tab title="Mage Staff">
+    ```bash
+    # Hold stick, then:
+    /ci create arcane_staff
+    /ci rename §b§lArcane Staff
+    /ci addline §7Channels mystical energies
+    /ci addline §b+150 Mind
+    /ci addline §3+10% Ki Regen
+    /ci plus arcane_staff 150 mnd
+    /ci percentage arcane_staff 0.80 will
+    /ci effect KIREGEN 0.10
+    ```
+  </Tab>
+  
+  <Tab title="Rogue Dagger">
+    ```bash
+    # Hold iron sword, then:
+    /ci create shadow_dagger
+    /ci rename §8§lShadow Dagger
+    /ci addline §7Strikes from the darkness
+    /ci addline §a+200 Dexterity
+    /ci addline §e+15% Stamina Regen
+    /ci plus shadow_dagger 200 dex
+    /ci percentage shadow_dagger 0.50 str
+    /ci effect STAMINAREGEN 0.15
+    ```
+  </Tab>
+</Tabs>
+
+### Managing Custom Items
+
+```bash
+# List all custom items
+/ci list
+/ci list 2    # Page 2
+
+# View item info
+/ci info      # Hold item in hand
+
+# Delete an item
+/ci delete my_sword
+
+# Edit existing item lore
+/ci setline 1 §7New first line of lore
+```
+
+See CustomItemCommand.java:422-450 for list functionality.
+
+## Raid System Quick Start
+
+<Warning>
+  Requires CustomNPCs plugin to be installed.
+</Warning>
+
+Create NPC-based raid encounters with party mechanics.
+
+### Setting Up a Raid
+
+<Steps>
+  <Step title="Create Raid Definition">
+    Raids are stored in JSON. Create via command or directly edit:
+    ```bash
+    # Raids are managed through the RaidManager
+    # Currently requires JSON editing or API usage
+    ```
+  </Step>
+  
+  <Step title="Configure CustomNPCs">
+    1. Create NPCs with CustomNPCs mod
+    2. Configure their stats, abilities, and loot
+    3. Note the NPC IDs for raid configuration
+  </Step>
+  
+  <Step title="Link NPCs to Raid">
+    The NPCDeathListener automatically detects NPC deaths:
+    ```java
+    // From Main.java:144-147
+    public static void callDeathEvent(INpcEvent.DiedEvent event) {
+        NPCDeathListener npcDeathListener = new NPCDeathListener();
+        npcDeathListener.onNpcDie(event);
+    }
+    ```
+  </Step>
+  
+  <Step title="Test the Raid">
+    Players can form parties and engage the NPCs. The system tracks kills and distributes rewards.
+  </Step>
+</Steps>
+
+### Raid Data Management
+
+```bash
+# Save raid configurations
+# Automatic on server shutdown, or manual:
+```
+
+```java
+import org.debentialc.raids.managers.RaidStorageManager;
+
+// Save all raids
+RaidStorageManager.saveAllRaids();
+
+// Load raids on startup
+RaidStorageManager.loadAllRaids();
+
+// Backup raid data
+RaidStorageManager.backupRaids();
+
+// Cleanup old raid files
+RaidStorageManager.cleanup();
+```
+
+See RaidStorageManager.java:83-126 for storage logic.
+
+## Territory Claims Quick Start
+
+Create purchasable territories with protection and member management.
+
+### Admin: Creating a Territory
+
+<Steps>
+  <Step title="Define Territory">
+    ```bash
+    /terrain create <id> <chunks>
+    ```
+    Example:
+    ```bash
+    /terrain create plaza 3
+    ```
+    
+    This creates a 3x3 chunk area (48x48 blocks).
+  </Step>
+  
+  <Step title="Set Purchase Price">
+    ```bash
+    /terrain price plaza 25000
+    ```
+    
+    Price is in your server's economy currency (requires Vault).
+  </Step>
+  
+  <Step title="Generate in World">
+    Stand at the desired location:
+    ```bash
+    /terrain commit plaza
+    ```
+    
+    This creates visual borders and protection at your current position.
+  </Step>
+  
+  <Step title="Verify Creation">
+    ```bash
+    /terrain info plaza
+    /terrain list
+    ```
+  </Step>
+</Steps>
+
+See TerrainCommand.java:71-163 for creation logic.
+
+### Player: Purchasing a Territory
+
+<Steps>
+  <Step title="Find Available Territory">
+    Walk to a territory with a sign marker, or:
+    ```bash
+    /terrain list
+    ```
+  </Step>
+  
+  <Step title="Check Territory Info">
+    ```bash
+    /terrain info
+    ```
+    
+    Shows price, size, and availability.
+  </Step>
+  
+  <Step title="Purchase Territory">
+    Right-click the territory sign or use the purchase command (implementation-specific).
+    
+    Your account is charged automatically via Vault.
+  </Step>
+  
+  <Step title="Manage Your Territory">
+    ```bash
+    # Add a trusted member
+    /terrain member plaza FriendName all
+    
+    # Add a builder
+    /terrain member plaza BuilderName build
+    
+    # Remove a member
+    /terrain kick plaza OldFriend
+    
+    # Transfer ownership
+    /terrain transfer plaza NewOwner
+    
+    # Sell back (50% refund)
+    /terrain sell plaza
+    ```
+  </Step>
+</Steps>
+
+See TerrainCommand.java:192-342 for member management.
+
+### Territory Management Examples
+
+<Tabs>
+  <Tab title="Shop Territory">
+    ```bash
+    # Owner sets up shop territory
+    /terrain member shop_01 Builder1 build
+    /terrain member shop_01 Builder2 build
+    /terrain member shop_01 ShopKeeper all
+    
+    # Builders can place chests and signs
+    # ShopKeeper has full access
+    # Others cannot break/place blocks
+    ```
+  </Tab>
+  
+  <Tab title="Guild Base">
+    ```bash
+    # Guild leader sets up base
+    /terrain member guild_hq Officer1 all
+    /terrain member guild_hq Officer2 all
+    /terrain member guild_hq Member1 containers
+    /terrain member guild_hq Member2 containers
+    /terrain member guild_hq Builder break
+    /terrain member guild_hq Builder build
+    
+    # Officers: full control
+    # Members: access chests only
+    # Builder: can modify terrain
+    ```
+  </Tab>
+  
+  <Tab title="Public Arena">
+    ```bash
+    # Admin creates arena
+    /terrain create pvp_arena 5
+    /terrain price pvp_arena 100000
+    /terrain commit pvp_arena
+    
+    # Owner configures PvP
+    # Add spectator access
+    /terrain member pvp_arena Spectator1 break
+    # 'break' here means minimal permissions
+    ```
+  </Tab>
+</Tabs>
+
+### Territory Commands Reference
+
+<CodeGroup>
+```bash Admin Commands
+# Territory management
+/terrain create <id> <chunks>      # Create territory
+/terrain price <id> <amount>       # Set price
+/terrain commit <id>               # Generate in world
+/terrain delete <id>               # Delete territory
+/terrain dissolve <id>             # Remove ownership, keep territory
+/terrain list                      # List all territories
+```
+
+```bash Player Commands
+# Information
+/terrain info [id]                 # Show territory details
+/terrain list                      # List territories
+
+# Management (owners only)
+/terrain member <id> <player> <role>   # Add member
+/terrain kick <id> <player>            # Remove member
+/terrain transfer <id> <player>        # Transfer ownership
+/terrain sell <id>                     # Sell back (50% refund)
+```
+
+```bash Roles
+# Member permission levels
+build       # Can place blocks
+break       # Can break blocks
+containers  # Can access chests/containers
+all         # Full permissions
+```
+</CodeGroup>
+
+See TerrainCommand.java:17-429 for all command implementations.
+
+## Common Workflows
+
+### Event Setup: Double XP Weekend
+
+```bash
+# Friday 6 PM - Activate global booster
+/booster global activate 100% 48h
+
+# Broadcast
+/broadcast §6§lDOUBLE XP WEEKEND! All rewards 2x until Sunday!
+
+# Sunday night - Auto-expires or manually:
+/booster global deactivate
+```
+
+### Reward System Integration
+
+```java
+import org.debentialc.boosters.core.BoosterUtils;
+import org.bukkit.entity.Player;
+
+public void giveQuestReward(Player player, double baseXP) {
+    // Apply booster multiplier
+    double multiplier = BoosterUtils.calculateCombinedMultiplier(player.getUniqueId());
+    double finalXP = baseXP * multiplier;
+    
+    // Give reward
+    player.giveExp((int) finalXP);
+    
+    // Inform player
+    if (multiplier > 1.0) {
+        player.sendMessage("§aReward: " + finalXP + " XP (" 
+            + BoosterUtils.formatPercentage(multiplier) + " boost!)");
+    }
+}
+```
+
+See Main.java:224-231 for example.
+
+### Custom Item Set Creation
+
+```bash
+# Create a complete armor set
+
+# Helmet
+/ci create warrior_helm
+/ci rename §c§lWarrior's Helmet
+/ci plus warrior_helm 50 con
+/ci percentage warrior_helm 0.20 str
+/ci effect HEALTHREGEN 0.03
+
+# Chestplate
+/ci create warrior_chest
+/ci rename §c§lWarrior's Chestplate
+/ci plus warrior_chest 100 con
+/ci percentage warrior_chest 0.30 str
+/ci effect HEALTHREGEN 0.05
+
+# Leggings
+/ci create warrior_legs
+/ci rename §c§lWarrior's Leggings
+/ci plus warrior_legs 75 con
+/ci percentage warrior_legs 0.25 str
+/ci effect STAMINAREGEN 0.04
+
+# Boots
+/ci create warrior_boots
+/ci rename §c§lWarrior's Boots
+/ci plus warrior_boots 50 dex
+/ci percentage warrior_boots 0.20 con
+/ci effect STAMINAREGEN 0.03
+
+# Give full set
+/ci give warrior_helm PlayerName 1
+/ci give warrior_chest PlayerName 1
+/ci give warrior_legs PlayerName 1
+/ci give warrior_boots PlayerName 1
+```
+
+### Territory Economy Setup
+
+```bash
+# Spawn shopping district (expensive, prime location)
+/terrain create shop_01 2
+/terrain price shop_01 100000
+/terrain commit shop_01
+
+/terrain create shop_02 2
+/terrain price shop_02 100000
+/terrain commit shop_02
+
+# Outskirts housing (cheaper)
+/terrain create house_01 1
+/terrain price house_01 10000
+/terrain commit house_01
+
+/terrain create house_02 1
+/terrain price house_02 10000
+/terrain commit house_02
+
+# Large guild territory
+/terrain create guild_zone 10
+/terrain price guild_zone 500000
+/terrain commit guild_zone
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Booster not applying to calculations">
+    Ensure you're using the API correctly:
+    
+    ```java
+    // CORRECT
+    double mult = BoosterUtils.calculateCombinedMultiplier(player.getUniqueId());
+    double result = baseValue * mult;
+    
+    // INCORRECT - only gets global
+    double globalOnly = GlobalBoosterManager.getCurrentMultiplier();
+    ```
+    
+    See Main.java:224-231 for proper usage.
+  </Accordion>
+  
+  <Accordion title="Custom items losing stats">
+    Stats are tied to the item's display name and lore. If players rename items via anvil, stats may not apply.
+    
+    **Solution**: Use the `CustomItemCommand.isCustom()` method to validate (CustomItemCommand.java:398-411):
+    
+    ```java
+    public boolean isCustom(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return items.containsValue(
+            new CustomItem()
+                .setMaterial(item.getTypeId())
+                .setLore(meta.getLore())
+                .setDisplayName(meta.getDisplayName())
+        );
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Territory borders not appearing">
+    Ensure the terrain was committed:
+    
+    ```bash
+    /terrain list
+    # Look for territories marked "(sin generar)"
+    
+    /terrain commit <id>
+    ```
+    
+    Stand at the desired location before committing.
+  </Accordion>
+  
+  <Accordion title="Raid NPCs not triggering events">
+    Verify CustomNPCs API is available:
+    
+    1. Check console for:
+       ```
+       [Debentialc] [Raids] NPCDeathListener registered correctly
+       ```
+    
+    2. If not registered:
+       - Ensure CustomNPCs loads before Debentialc
+       - Check CustomNPCs version compatibility
+       - Verify API is exposed (Main.java:107-110)
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Customize module behavior and settings
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/commands/booster">
+    Integrate Debentialc into your plugins
+  </Card>
+  <Card title="Examples" icon="book" href="/guides/boosters-setup">
+    More advanced usage examples
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- **Main Plugin Class**: `org.debentialc.Main` (Main.java:33-232)
+- **Booster API**: `org.debentialc.boosters.core.BoosterUtils`
+- **Custom Items**: `org.debentialc.customitems.commands.CustomItemCommand`
+- **Territory Management**: `org.debentialc.claims.commands.TerrainCommand`
+- **Raid Storage**: `org.debentialc.raids.managers.RaidStorageManager`

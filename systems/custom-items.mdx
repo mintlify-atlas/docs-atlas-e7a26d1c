@@ -1,0 +1,754 @@
+---
+title: "Custom Items System"
+description: "Complete technical documentation for the Custom Items system - stat bonuses, effects, fragments, armor customization, and NBT integration"
+---
+
+## Overview
+
+The Custom Items System provides a powerful framework for creating items with custom stat bonuses, effects, and enhancements for Dragon Block C. It includes support for **five core stats** (STR, CON, DEX, WILL, MND), **regeneration effects**, **armor fragments**, and **tiered customization** with operation-based bonuses (+, -, ×).
+
+<CardGroup cols={2}>
+  <Card title="Custom Items" icon="sword">
+    Create weapons and consumables with stat bonuses and DBC integration
+  </Card>
+  <Card title="Fragment System" icon="gem">
+    Apply upgradeable fragments to armor with tiered limits and operations
+  </Card>
+  <Card title="Custom Armor" icon="shield">
+    Full armor customization with hash-based tracking and persistence
+  </Card>
+  <Card title="Effects" icon="sparkles">
+    Health, Ki, and Stamina regeneration effects for equipment
+  </Card>
+</CardGroup>
+
+## Architecture
+
+### Package Structure
+
+```
+org.debentialc.customitems/
+├── commands/                # CLI interface
+│   ├── CustomItemCommand.java
+│   ├── CustomArmorMenuCommand.java
+│   ├── FragmentCommand.java
+│   └── FragmentAdminCommand.java
+├── tools/
+│   ├── ci/                  # Core item system
+│   │   ├── CustomItem.java
+│   │   ├── CustomArmor.java
+│   │   ├── CustomManager.java
+│   │   └── EffectsManager.java
+│   ├── fragments/           # Fragment upgrade system
+│   │   ├── FragmentManager.java
+│   │   ├── ArmorFragment.java
+│   │   ├── CustomizedArmor.java
+│   │   ├── TierConfig.java
+│   │   └── FragmentBonusIntegration.java
+│   ├── storage/             # Persistence layer
+│   │   ├── CustomItemStorage.java
+│   │   └── CustomArmorStorage.java
+│   ├── nbt/                 # NBT data handling
+│   │   ├── NbtHandler.java
+│   │   └── NbtItemBuilder.java
+│   └── stats/               # DBC stat calculations
+│       └── StatsCalculator.java
+└── events/                  # Event handlers
+    ├── CustomArmor.java
+    ├── FragmentApplyListener.java
+    └── ItemCreationListener.java
+```
+
+## Core Stats System
+
+### Available Stats
+
+The system supports five primary stats that integrate with Dragon Block C:
+
+| Stat | DBC Attribute | Description |
+|------|--------------|-------------|
+| **STR** | Strength | Increases melee damage and ki damage |
+| **CON** | Constitution | Increases health points and defense |
+| **DEX** | Dexterity | Increases speed and evasion |
+| **WILL** | Willpower | Increases ki pool and ki regeneration |
+| **MND** | Mind | Increases special attack damage |
+
+### Stat Operations
+
+Each stat bonus uses one of three operations:
+
+<CardGroup cols={3}>
+  <Card title="Addition (+)" icon="plus">
+    Adds a flat value to the stat
+    
+    Example: `+500 STR`
+  </Card>
+  <Card title="Subtraction (-)" icon="minus">
+    Subtracts a value from the stat
+    
+    Example: `-200 DEX`
+  </Card>
+  <Card title="Multiplication (×)" icon="xmark">
+    Multiplies the stat by a percentage
+    
+    Example: `×15%` = 1.15x multiplier
+  </Card>
+</CardGroup>
+
+<Note>
+**Percentage Multipliers:** When using `*` operation with percentages:
+- `15%` internally becomes `1.15` (add 15% to base)
+- `-20%` internally becomes `0.80` (reduce by 20%)
+- `100%` internally becomes `2.0` (double the value)
+</Note>
+
+## Custom Items
+
+### CustomItem Class
+
+**Location:** `customitems/tools/ci/CustomItem.java:13`
+
+The core data model for custom items.
+
+```java
+public class CustomItem {
+    private String id;                              // Unique identifier
+    private int material;                           // Minecraft material ID
+    private short durabilityData;                   // Item data value
+    private String displayName;                     // Display name
+    private List<String> lore;                      // Item lore
+    
+    // Stat bonuses
+    private HashMap<String, String> operation;      // Operation per stat (+/-/*)
+    private HashMap<String, Double> valueByStat;   // Value per stat
+    
+    // Effects
+    private HashMap<String, Double> effects;        // Regen effects
+    
+    // Optional features
+    private int maxDurability = -1;                 // Custom durability
+    private boolean unbreakable = false;
+    private boolean consumable = false;             // One-time use
+    private List<String> commands = new ArrayList<>(); // Execute on use
+    private int tpValue = 0;                        // TP reward on consume
+    private int attackDamage = -1;                  // Custom attack damage
+    private String nbtData = null;                  // Raw NBT string
+}
+```
+
+### Creating Custom Items
+
+<Steps>
+  <Step title="Hold Base Item">
+    Hold the Minecraft item you want to customize in your hand
+  </Step>
+  <Step title="Create Item">
+    Run `/ci create <id>` to register it
+  </Step>
+  <Step title="Add Stats">
+    Use `/ci plus <id> <value> <stat>` for additive bonuses
+    
+    Or `/ci percentage <id> <value> <stat>` for multipliers
+  </Step>
+  <Step title="Add Effects">
+    Use `/ci effect <type> <value>` for regeneration effects
+  </Step>
+  <Step title="Give to Players">
+    Use `/ci give <id> <player> <amount>` to distribute
+  </Step>
+</Steps>
+
+### Example: Creating a Powerful Sword
+
+```bash
+# Hold diamond sword, then run:
+/ci create legendary_blade
+
+# Add +500 base strength
+/ci plus legendary_blade 500 str
+
+# Add +20% dexterity multiplier
+/ci percentage legendary_blade 20 dex
+
+# Add +300 constitution
+/ci plus legendary_blade 300 con
+
+# Add 5% health regeneration
+/ci effect HEALTHREGEN 0.05
+
+# Customize name and lore
+/ci rename §6§l[Legendary] §eDragon Slayer Blade
+/ci addline §7A sword forged in dragon fire
+/ci addline §e+500 STR §8| §b+20% DEX §8| §a+300 CON
+/ci addline §c+5% Health Regen
+
+# Give to player
+/ci give legendary_blade Notch 1
+```
+
+### CustomItemCommand Reference
+
+**Location:** `customitems/commands/CustomItemCommand.java:19`
+
+<Accordion title="Item Management Commands">
+  ```bash
+  /ci create <id>              # Create custom item from hand
+  /ci delete <id>              # Delete registered item
+  /ci list [page]              # List all custom items
+  /ci info                     # Show info for item in hand
+  /ci give <id> <player> <amt> # Give custom item
+  ```
+</Accordion>
+
+<Accordion title="Stat Configuration Commands">
+  ```bash
+  /ci plus <id> <value> <stat>       # Add flat bonus (+)
+  /ci less <id> <value> <stat>       # Add negative bonus (-)
+  /ci percentage <id> <value> <stat> # Add multiplier (*)
+  ```
+  
+  **Valid stats:** `str`, `con`, `dex`, `will`, `mnd`
+</Accordion>
+
+<Accordion title="Lore and Display Commands">
+  ```bash
+  /ci rename <text>          # Change display name
+  /ci addline <text>         # Add lore line
+  /ci setline <line> <text>  # Edit specific lore line
+  ```
+</Accordion>
+
+<Accordion title="Effect Commands">
+  ```bash
+  /ci effect <type> <value>  # Add regeneration effect
+  ```
+  
+  **Valid types:**
+  - `HEALTHREGEN` - Health regeneration percentage
+  - `KIREGEN` - Ki regeneration percentage
+  - `STAMINAREGEN` - Stamina regeneration percentage
+  
+  **Example:** `/ci effect HEALTHREGEN 0.10` = 10% health regen
+</Accordion>
+
+## Fragment System
+
+### Overview
+
+Fragments allow players to upgrade armor pieces with stat bonuses. The system uses **tiered limits** to control power progression.
+
+### ArmorFragment Class
+
+**Location:** `customitems/tools/fragments/ArmorFragment.java:22`
+
+```java
+public class ArmorFragment {
+    private String id;                // Fragment identifier
+    private String attribute;         // STR/CON/DEX/WIL/MND/SPI
+    private String value;             // "500", "-200", "15%"
+    private String operation;         // "+", "-", "*"
+    private double numericValue;      // Parsed numeric value
+    private String displayName;
+    private int materialId;
+    private short materialData;
+    private List<String> lore;
+}
+```
+
+### Value Parsing System
+
+**Location:** `customitems/tools/fragments/ArmorFragment.java:53`
+
+```java
+private void parseValue(String value) {
+    if (value.endsWith("%")) {
+        // PERCENTAGE: "15%" → operation "*", value 1.15
+        this.operation = "*";
+        String numStr = value.substring(0, value.length() - 1);
+        double percentage = Double.parseDouble(numStr);
+        this.numericValue = 1.0 + (percentage / 100.0);
+    } else if (value.startsWith("-")) {
+        // NEGATIVE: "-500" → operation "-", value 500
+        this.operation = "-";
+        this.numericValue = Math.abs(Double.parseDouble(value));
+    } else {
+        // POSITIVE: "500" → operation "+", value 500
+        this.operation = "+";
+        this.numericValue = Double.parseDouble(value);
+    }
+}
+```
+
+<Warning>
+**Percentage Conversion:**
+- User input: `"15%"`
+- Stored as: `1.15` (DBC multiplier)
+- Displayed as: `"15%"` (user-friendly)
+
+Internal values are **always** DBC-compatible multipliers.
+</Warning>
+
+### Fragment Application
+
+**Location:** `customitems/tools/fragments/FragmentManager.java:36`
+
+```java
+public boolean applyFragment(Player player, ItemStack fragment, ItemStack armor) {
+    // 1. Validate fragment
+    if (!ArmorFragment.isFragment(fragment)) {
+        player.sendMessage("§c✗ Este no es un fragmento válido");
+        return false;
+    }
+    
+    // 2. Extract fragment data
+    String attribute = ArmorFragment.getFragmentAttribute(fragment);
+    String operation = ArmorFragment.getFragmentOperation(fragment);
+    double value = ArmorFragment.getFragmentValue(fragment);
+    
+    // 3. Load or create customized armor
+    CustomizedArmor customArmor;
+    if (CustomizedArmor.isCustomized(armor)) {
+        customArmor = CustomizedArmor.fromItemStack(armor);
+    } else {
+        customArmor = convertVanillaArmor(armor);
+    }
+    
+    // 4. Validate tier limits
+    if (!tierConfig.canApply(customArmor.getTier(), attribute, 
+                              currentValue, valueToAdd, operation)) {
+        player.sendMessage("§c✗ El valor excedería el límite");
+        return false;
+    }
+    
+    // 5. Calculate new value based on operation
+    int currentValue = customArmor.getAttributeValue(attribute);
+    int newValue;
+    
+    switch (operation) {
+        case "+":
+            newValue = currentValue + (int) value;
+            break;
+        case "-":
+            newValue = currentValue - (int) value;
+            break;
+        case "*":
+            // Sum PERCENTAGES for multiplicative bonuses
+            int scaledFragmentValue = (int) Math.round(value * 100);
+            String currentOp = customArmor.getOperations().get(attribute);
+            
+            if (currentOp == null || !currentOp.equals("*")) {
+                // First multiplicative fragment
+                newValue = scaledFragmentValue;
+            } else {
+                // Add percentages: 20% + 10% = 30%
+                double currentPercentage = (currentValue / 100.0 - 1.0) * 100.0;
+                double fragmentPercentage = (scaledFragmentValue / 100.0 - 1.0) * 100.0;
+                double totalPercentage = currentPercentage + fragmentPercentage;
+                newValue = (int) Math.round((1.0 + totalPercentage / 100.0) * 100);
+            }
+            break;
+    }
+    
+    // 6. Apply and save
+    customArmor.getAttributes().put(attribute, newValue);
+    customArmor.getOperations().put(attribute, operation);
+    customArmor.applyToItemStack(armor);
+    armorStorage.saveArmor(customArmor);
+    
+    // 7. Consume fragment
+    if (fragment.getAmount() > 1) {
+        fragment.setAmount(fragment.getAmount() - 1);
+    } else {
+        player.setItemInHand(new ItemStack(Material.AIR));
+    }
+    
+    return true;
+}
+```
+
+### Tier Configuration
+
+**Location:** `customitems/tools/fragments/TierConfig.java`
+
+Defines limits for each tier and attribute:
+
+```java
+// Example tier structure
+public class TierConfig {
+    private Map<String, TierLimits> tiers = new HashMap<>();
+    
+    // Tier 1 (Basic)
+    tiers.put("BASIC", new TierLimits(
+        Map.of(
+            "STR", 1000,    // Max +1000 STR
+            "CON", 1000,
+            "DEX", 500
+        ),
+        Set.of("+")       // Only addition allowed
+    ));
+    
+    // Tier 2 (Advanced)
+    tiers.put("ADVANCED", new TierLimits(
+        Map.of(
+            "STR", 2000,
+            "CON", 2000,
+            "DEX", 1500
+        ),
+        Set.of("+", "-")  // Addition and subtraction
+    ));
+    
+    // Tier 3 (Elite)
+    tiers.put("ELITE", new TierLimits(
+        Map.of(
+            "STR", 5000,
+            "CON", 5000,
+            "DEX", 3000
+        ),
+        Set.of("+", "-", "*")  // All operations allowed
+    ));
+}
+```
+
+<Tip>
+**Tier Progression:**
+- **Basic:** Only flat bonuses (+), limited values
+- **Advanced:** Flat bonuses and penalties (+/-), higher limits
+- **Elite:** All operations including multipliers (+/-/×), highest limits
+</Tip>
+
+### Fragment Tag System
+
+**Location:** `customitems/tools/fragments/ArmorFragment.java:34`
+
+Fragments are identified by a hidden NBT tag in the lore:
+
+```java
+private static final String FRAGMENT_TAG = "§8[FRAGMENT:%s:%s:%s]"; // attr:op:value
+
+// Example tag in item lore (invisible to players):
+// §8[FRAGMENT:STR:+:500]
+// §8[FRAGMENT:DEX:*:15%]
+```
+
+**Detection Methods:**
+
+```java
+// Check if item is a fragment
+public static boolean isFragment(ItemStack item) {
+    if (item == null || !item.hasItemMeta()) return false;
+    List<String> lore = item.getItemMeta().getLore();
+    for (String line : lore) {
+        if (line.contains("[FRAGMENT:")) return true;
+    }
+    return false;
+}
+
+// Extract attribute (STR, CON, etc.)
+public static String getFragmentAttribute(ItemStack item) {
+    String clean = extractFragmentTag(item);
+    String[] parts = clean.split(":");
+    return parts[0]; // "STR"
+}
+
+// Extract operation (+, -, *)
+public static String getFragmentOperation(ItemStack item) {
+    String clean = extractFragmentTag(item);
+    String[] parts = clean.split(":");
+    return parts[1]; // "+"
+}
+
+// Extract raw value ("500", "15%")
+public static String getFragmentValueRaw(ItemStack item) {
+    String clean = extractFragmentTag(item);
+    String[] parts = clean.split(":");
+    return parts[2]; // "15%"
+}
+```
+
+## Custom Armor
+
+### CustomizedArmor Class
+
+**Location:** `customitems/tools/fragments/CustomizedArmor.java`
+
+```java
+public class CustomizedArmor {
+    private String hash;                            // Unique identifier
+    private String tier;                            // BASIC/ADVANCED/ELITE
+    private int materialType;                       // Minecraft material ID
+    private String armorSlot;                       // HELMET/CHESTPLATE/LEGGINGS/BOOTS
+    private String displayName;
+    private Map<String, Integer> attributes;        // Attribute → Value
+    private Map<String, String> operations;         // Attribute → Operation
+    
+    // Apply attributes to ItemStack
+    public void applyToItemStack(ItemStack item) {
+        ItemMeta meta = item.getItemMeta();
+        
+        // Update lore with stats
+        List<String> lore = new ArrayList<>();
+        lore.add("§8[Tier: §7" + tier + "§8]");
+        
+        for (Map.Entry<String, Integer> entry : attributes.entrySet()) {
+            String attr = entry.getKey();
+            int value = entry.getValue();
+            String op = operations.get(attr);
+            
+            if (op.equals("*")) {
+                // Display as percentage
+                double percentage = (value / 100.0 - 1.0) * 100.0;
+                lore.add(String.format("§e%s: §a%+.0f%%", attr, percentage));
+            } else {
+                // Display as flat value
+                lore.add(String.format("§e%s: §f%s%d", attr, op, value));
+            }
+        }
+        
+        // Add hash tag (hidden)
+        lore.add("§8[ARMOR:" + hash + "]");
+        
+        meta.setLore(lore);
+        item.setItemMeta(meta);
+    }
+}
+```
+
+### Hash Generation
+
+**Location:** `customitems/tools/fragments/HashGenerator.java`
+
+```java
+public static String generateUniqueHash(Set<String> existingHashes) {
+    String hash;
+    do {
+        hash = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    } while (existingHashes.contains(hash));
+    return hash;
+}
+```
+
+Each customized armor piece gets a unique 8-character hash for tracking.
+
+## Effects System
+
+### Available Effects
+
+<CardGroup cols={3}>
+  <Card title="Health Regen" icon="heart">
+    `HEALTHREGEN`
+    
+    Percentage of max HP regenerated per tick
+  </Card>
+  <Card title="Ki Regen" icon="bolt">
+    `KIREGEN`
+    
+    Percentage of max Ki regenerated per tick
+  </Card>
+  <Card title="Stamina Regen" icon="fire">
+    `STAMINAREGEN`
+    
+    Percentage of max Stamina regenerated per tick
+  </Card>
+</CardGroup>
+
+### EffectsManager
+
+**Location:** `customitems/tools/ci/EffectsManager.java`
+
+```java
+public class EffectsManager {
+    
+    /**
+     * Apply regeneration effects from equipped items
+     */
+    public static void applyEffects(Player player, CustomItem item) {
+        if (item.getEffects() == null || item.getEffects().isEmpty()) {
+            return;
+        }
+        
+        IDBCPlayer dbcPlayer = getDBCPlayer(player);
+        if (dbcPlayer == null) return;
+        
+        for (Map.Entry<String, Double> effect : item.getEffects().entrySet()) {
+            String type = effect.getKey();
+            double value = effect.getValue();
+            
+            switch (type) {
+                case "HEALTHREGEN":
+                    int maxHP = dbcPlayer.getMaxHealth();
+                    int regenHP = (int) (maxHP * value);
+                    dbcPlayer.setHealth(dbcPlayer.getHealth() + regenHP);
+                    break;
+                    
+                case "KIREGEN":
+                    int maxKi = dbcPlayer.getMaxKi();
+                    int regenKi = (int) (maxKi * value);
+                    dbcPlayer.setKi(dbcPlayer.getKi() + regenKi);
+                    break;
+                    
+                case "STAMINAREGEN":
+                    int maxStamina = dbcPlayer.getMaxStamina();
+                    int regenStamina = (int) (maxStamina * value);
+                    dbcPlayer.setStamina(dbcPlayer.getStamina() + regenStamina);
+                    break;
+            }
+        }
+    }
+}
+```
+
+## Storage System
+
+### CustomItemStorage
+
+**Location:** `customitems/tools/storage/CustomItemStorage.java`
+
+```java
+public class CustomItemStorage {
+    private static final String BASE_PATH = "plugins/Debentialc/data/customitems";
+    
+    public void saveItem(CustomItem item) {
+        Path filePath = Paths.get(BASE_PATH, "items", item.getId() + ".json");
+        String json = GSON.toJson(item);
+        Files.write(filePath, json.getBytes(StandardCharsets.UTF_8));
+    }
+    
+    public Map<String, CustomItem> loadAllItems() {
+        Map<String, CustomItem> items = new HashMap<>();
+        Path itemsDir = Paths.get(BASE_PATH, "items");
+        
+        Files.walk(itemsDir)
+            .filter(p -> p.toString().endsWith(".json"))
+            .forEach(path -> {
+                String json = new String(Files.readAllBytes(path));
+                CustomItem item = GSON.fromJson(json, CustomItem.class);
+                items.put(item.getId(), item);
+            });
+        
+        return items;
+    }
+}
+```
+
+### CustomArmorStorage
+
+**Location:** `customitems/tools/fragments/CustomArmorStorage.java`
+
+Stores customized armor by hash:
+
+```
+plugins/Debentialc/data/customitems/
+├── items/                  # Custom items
+│   ├── legendary_blade.json
+│   ├── dragon_boots.json
+│   └── ...
+└── armor/                  # Customized armor
+    ├── A1B2C3D4.json      # By hash
+    ├── E5F6G7H8.json
+    └── ...
+```
+
+## Advanced Features
+
+### NBT Integration
+
+**Location:** `customitems/tools/nbt/NbtHandler.java`
+
+```java
+public class NbtHandler {
+    
+    /**
+     * Apply custom NBT data to ItemStack
+     */
+    public static ItemStack applyNBT(ItemStack item, String nbtString) {
+        // Parse NBT string: "{CustomModelData:12345,Unbreakable:1b}"
+        NBTTagCompound compound = parseNBT(nbtString);
+        
+        // Apply to item
+        net.minecraft.server.v1_7_R4.ItemStack nmsStack = CraftItemStack.asNMSCopy(item);
+        nmsStack.setTag(compound);
+        
+        return CraftItemStack.asBukkitCopy(nmsStack);
+    }
+}
+```
+
+### Consumable Items
+
+```java
+// Mark item as consumable
+customItem.setConsumable(true);
+
+// Set TP reward on consumption
+customItem.setTpValue(500);
+
+// Add commands to execute
+customItem.setCommands(Arrays.asList(
+    "give @p diamond 1",
+    "effect @p speed 60 1"
+));
+```
+
+### Custom Durability
+
+```java
+// Set custom max durability
+customItem.setMaxDurability(1000);
+
+// Make unbreakable
+customItem.setUnbreakable(true);
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Descriptive IDs" icon="tag">
+    Use clear, lowercase IDs: `legendary_blade`, not `lb1` or `LegendaryBlade`
+  </Card>
+  <Card title="Balance Stats" icon="scale-balanced">
+    Test stat combinations in-game to avoid overpowered items
+  </Card>
+  <Card title="Tier Progression" icon="stairs">
+    Design fragments that require tier upgrades for powerful bonuses
+  </Card>
+  <Card title="Visual Feedback" icon="eye">
+    Use colorful lore to make stats clear and appealing
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Stats not applying to player">
+  **Solutions:**
+  1. Verify item is registered: `/ci list`
+  2. Check item in hand: `/ci info`
+  3. Ensure DBC is loaded and player has DBC data
+  4. Check console for calculation errors
+</Accordion>
+
+<Accordion title="Fragment application fails">
+  **Solutions:**
+  1. Check if armor is at tier limit
+  2. Verify operation is allowed for tier
+  3. Check fragment is valid: look for `[FRAGMENT:` in lore
+  4. Try converting armor first with a basic fragment
+</Accordion>
+
+<Accordion title="Custom armor lost after relog">
+  **Solutions:**
+  1. Verify hash exists in `plugins/Debentialc/data/customitems/armor/`
+  2. Check file permissions on data directory
+  3. Look for JSON save errors in console
+  4. Ensure armor has the `[ARMOR:hash]` tag in lore
+</Accordion>
+
+## Related Systems
+
+<CardGroup cols={2}>
+  <Card title="Boosters" href="/systems/boosters">
+    Combine custom items with boosters for amplified effects
+  </Card>
+  <Card title="Raids" href="/systems/raids">
+    Award custom items and fragments as raid rewards
+  </Card>
+</CardGroup>

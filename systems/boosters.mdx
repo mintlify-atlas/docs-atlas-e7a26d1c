@@ -1,0 +1,570 @@
+---
+title: "Boosters System"
+description: "Complete technical documentation for the Boosters system - global and personal multipliers, rank integration, TP rewards, and PlaceholderAPI support"
+---
+
+## Overview
+
+The Boosters System provides a comprehensive multiplier framework for TP (Training Points) rewards in Dragon Block C. It supports both **global boosters** (server-wide) and **personal boosters** (individual players), with configurable rank-based multipliers, persistent storage, and full PlaceholderAPI integration.
+
+<CardGroup cols={2}>
+  <Card title="Global Boosters" icon="globe">
+    Server-wide multipliers activated by admins that affect all players simultaneously
+  </Card>
+  <Card title="Personal Boosters" icon="user">
+    Individual player multipliers with 5 tier levels from Minor to Ultimate
+  </Card>
+  <Card title="Rank Multipliers" icon="crown">
+    Configurable rank-based bonuses (Hakaishin, Kaio, Kami, etc.) for VIP players
+  </Card>
+  <Card title="PlaceholderAPI" icon="code">
+    Complete placeholder expansion for displaying booster stats in scoreboards and chat
+  </Card>
+</CardGroup>
+
+## Architecture
+
+### Core Components
+
+The system is organized into several key packages:
+
+```
+org.debentialc.boosters/
+├── core/               # Initialization and configuration
+│   ├── BoosterModule.java
+│   ├── BoosterSettings.java
+│   ├── BoosterParser.java
+│   └── BoosterTaskScheduler.java
+├── managers/           # Business logic
+│   ├── GlobalBoosterManager.java
+│   └── PersonalBoosterManager.java
+├── models/             # Data structures
+│   ├── GlobalBooster.java
+│   └── PersonalBooster.java
+├── storage/            # Persistence layer
+│   └── BoosterStorage.java
+├── integration/        # DBC API integration
+│   ├── BoosterTPAPI.java
+│   └── TPConsumeListener.java
+└── placeholders/       # PlaceholderAPI expansion
+    └── BoosterPlaceholder.java
+```
+
+### Initialization Flow
+
+<Steps>
+  <Step title="Module Initialization">
+    `BoosterModule.initialize(plugin)` is called from the main plugin class
+  </Step>
+  <Step title="Load Stored Data">
+    `BoosterStorage.loadAllData()` restores active boosters from JSON files
+  </Step>
+  <Step title="Register Placeholders">
+    `BoosterPlaceholder` registers with PlaceholderAPI if available
+  </Step>
+  <Step title="Schedule Tasks">
+    `BoosterTaskScheduler` starts expiration checking and cleanup tasks
+  </Step>
+</Steps>
+
+## Key Classes
+
+### BoosterModule
+
+**Location:** `boosters/core/BoosterModule.java:23`
+
+The central initialization point for the entire booster system.
+
+```java
+public static void initialize(JavaPlugin instance) {
+    plugin = instance;
+    loadData();
+    registerPlaceholders();
+    scheduleT();
+    plugin.getLogger().info("Sistema de Boosters inicializado correctamente");
+}
+```
+
+**Key Responsibilities:**
+- Load persisted booster data from storage
+- Register PlaceholderAPI expansion if available
+- Initialize scheduled tasks for expiration checking
+- Provide plugin instance to other components
+
+### GlobalBoosterManager
+
+**Location:** `boosters/managers/GlobalBoosterManager.java:7`
+
+Manages the single active global booster instance.
+
+```java
+public static void activateBooster(double multiplier, String activatedBy) {
+    Instant now = Instant.now();
+    Instant end = now.plusSeconds(durationSeconds);
+    GlobalBooster booster = new GlobalBooster(multiplier, now, end, activatedBy);
+    activeBooster = booster;
+}
+```
+
+**Features:**
+- **Thread-safe:** Uses `volatile` for the active booster reference
+- **Auto-expiration:** Checks expiration on every access via `getActiveBooster()`
+- **Configurable duration:** Default duration from `BoosterSettings`
+- **Tracking:** Records who activated the booster
+
+**API Methods:**
+- `activateBooster(double multiplier, String activatedBy)` - Activate with default duration
+- `deactivateBooster()` - Manually deactivate the current booster
+- `getCurrentMultiplier()` - Get active multiplier or 1.0 if none
+- `getRemainingSeconds()` - Time remaining before expiration
+- `checkExpiration()` - Manually trigger expiration check
+
+### PersonalBoosterManager
+
+**Location:** `boosters/managers/PersonalBoosterManager.java:9`
+
+Manages personal boosters for all players using a concurrent map.
+
+```java
+private static final Map<UUID, List<PersonalBooster>> playerBoosters 
+    = new ConcurrentHashMap<>();
+
+public static void activateBooster(UUID playerId, int index) {
+    List<PersonalBooster> boosters = playerBoosters.get(playerId);
+    if (boosters != null && index >= 0 && index < boosters.size()) {
+        PersonalBooster booster = boosters.get(index);
+        booster.activate(BoosterSettings.getPersonalBoosterDuration());
+    }
+}
+```
+
+**Features:**
+- **Multiple boosters per player:** Players can store multiple inactive boosters
+- **One active at a time:** Only one booster can be active per player
+- **Storage expiration:** Unused boosters expire after configured days
+- **Level-based multipliers:** 5 levels with increasing bonuses
+
+### BoosterSettings
+
+**Location:** `boosters/core/BoosterSettings.java:6`
+
+Centralized configuration for all booster parameters.
+
+```java
+private static long globalBoosterDuration = 3600;        // 1 hour
+private static long personalBoosterDuration = 900;       // 15 minutes
+private static long personalBoosterStorageDays = 30;     // 30 days
+
+// Personal booster level multipliers
+personalBoosterLevels.put(1, 0.10);  // Minor: +10%
+personalBoosterLevels.put(2, 0.25);  // Standard: +25%
+personalBoosterLevels.put(3, 0.50);  // Powerful: +50%
+personalBoosterLevels.put(4, 1.00);  // Extreme: +100%
+personalBoosterLevels.put(5, 2.00);  // Ultimate: +200%
+
+// Rank-based multipliers
+rankMultipliers.put("hakaishin", 2.0);   // +100%
+rankMultipliers.put("kaio", 1.8);        // +80%
+rankMultipliers.put("kami", 1.6);        // +60%
+rankMultipliers.put("vip+", 1.4);        // +40%
+rankMultipliers.put("vip", 1.3);         // +30%
+```
+
+**Configuration Methods:**
+- `setGlobalBoosterDuration(long seconds)` - Set default global duration
+- `setPersonalBoosterDuration(long seconds)` - Set personal activation time
+- `setPersonalBoosterStorageDays(long days)` - Set storage expiration
+- `setRankMultiplier(String rank, double multiplier)` - Configure rank bonuses
+
+## TP Integration
+
+### BoosterTPAPI
+
+**Location:** `boosters/integration/BoosterTPAPI.java:9`
+
+Provides the bridge between boosters and Dragon Block C's TP system.
+
+```java
+public static void giveTPsWithBooster(Player player, int baseTPs) {
+    IDBCPlayer dbcPlayer = NpcAPI.Instance().getPlayer(player.getName()).getDBCPlayer();
+    
+    // Calculate combined multiplier
+    double globalMultiplier = GlobalBoosterManager.getCurrentMultiplier();
+    double personalMultiplier = PersonalBoosterManager.getActiveMultiplier(player.getUniqueId());
+    double combinedMultiplier = globalMultiplier * personalMultiplier;
+    
+    // Apply and award TPs
+    int totalTPs = (int) Math.round(baseTPs * combinedMultiplier);
+    dbcPlayer.setTP(dbcPlayer.getTP() + totalTPs);
+}
+```
+
+<Note>
+**Multiplier Stacking:** Global and personal boosters multiply together. For example:
+- Base TPs: 100
+- Global booster: 2.0x (100%)
+- Personal booster: 1.5x (50%)
+- **Final TPs: 300** (100 × 2.0 × 1.5)
+</Note>
+
+**API Methods:**
+
+| Method | Description | Returns |
+|--------|-------------|--------|
+| `giveTPsWithBooster(Player, int)` | Award TPs with active boosters | void |
+| `calculateBoostedTPs(Player, int)` | Calculate TPs without awarding | int |
+| `getCombinedMultiplier(Player)` | Get player's total multiplier | double |
+| `hasActiveBooster(Player)` | Check if any booster is active | boolean |
+| `getBonusTPs(Player, int)` | Calculate bonus TPs from base | int |
+
+### Usage Example
+
+```java
+// In your custom quest or mob kill handler
+import org.debentialc.boosters.integration.BoosterTPAPI;
+
+@EventHandler
+public void onMobKill(EntityDeathEvent event) {
+    Player player = event.getEntity().getKiller();
+    if (player == null) return;
+    
+    int baseTPs = 100; // Base TP reward
+    
+    // Award TPs with booster multipliers applied
+    BoosterTPAPI.giveTPsWithBooster(player, baseTPs);
+    
+    // Get the actual amount awarded
+    int totalTPs = BoosterTPAPI.calculateBoostedTPs(player, baseTPs);
+    player.sendMessage("§aAwarded: " + totalTPs + " TPs");
+}
+```
+
+## Storage System
+
+### BoosterStorage
+
+**Location:** `boosters/storage/BoosterStorage.java:17`
+
+Handles persistence using Gson for JSON serialization.
+
+```java
+private static final String BASE_PATH = "plugins/Debentialc/data/boosters";
+private static final String GLOBAL_FILE = "global.json";
+private static final String PERSONAL_DIR = "personal";
+```
+
+**Storage Structure:**
+```
+plugins/Debentialc/data/boosters/
+├── global.json                          # Active global booster
+└── personal/                            # Player-specific boosters
+    ├── <uuid>/
+    │   └── boosters.json               # Player's booster inventory
+    └── ...
+```
+
+**Key Operations:**
+
+```java
+// Save global booster
+public static void saveGlobalBooster(GlobalBooster booster) {
+    Path filePath = Paths.get(BASE_PATH, GLOBAL_FILE);
+    String json = GSON.toJson(booster);
+    Files.write(filePath, json.getBytes(StandardCharsets.UTF_8));
+}
+
+// Load on startup
+public static void loadAllData() {
+    GlobalBooster global = loadGlobalBooster();
+    if (global != null && !global.hasExpired()) {
+        GlobalBoosterManager.restoreBooster(global);
+    }
+}
+```
+
+<Warning>
+Boosters are automatically saved:
+- On server shutdown via `BoosterModule.shutdown()`
+- When manually activated/deactivated
+- Periodically by the task scheduler
+
+Manual save calls are rarely needed.
+</Warning>
+
+## PlaceholderAPI Integration
+
+### BoosterPlaceholder
+
+**Location:** `boosters/placeholders/BoosterPlaceholder.java:14`
+
+Provides comprehensive placeholders for displaying booster information.
+
+**Identifier:** `boosters`
+
+### Available Placeholders
+
+#### Global Booster Placeholders
+
+| Placeholder | Description | Example Output |
+|------------|-------------|---------------|
+| `%boosters_global_active%` | Active status | §aActivo / §cInactivo |
+| `%boosters_global_multiplier%` | Current multiplier | §62.00x |
+| `%boosters_global_percentage%` | Percentage bonus | §a+100% |
+| `%boosters_global_time%` | Remaining time | §61h 45m 30s |
+| `%boosters_global_activator%` | Who activated it | §6AdminName |
+
+#### Personal Booster Placeholders
+
+| Placeholder | Description | Example Output |
+|------------|-------------|---------------|
+| `%boosters_personal_active%` | Active status | §aActivo / §cInactivo |
+| `%boosters_personal_multiplier%` | Current multiplier | §61.50x |
+| `%boosters_personal_percentage%` | Percentage bonus | §a+50% |
+| `%boosters_personal_level%` | Booster tier name | §6Powerful |
+| `%boosters_personal_time%` | Remaining time | §614m 30s |
+| `%boosters_personal_count%` | Stored boosters | §63 |
+
+#### Combined Placeholders
+
+| Placeholder | Description | Example Output |
+|------------|-------------|---------------|
+| `%boosters_combined_multiplier%` | Total effective multiplier | §63.00x |
+| `%boosters_combined_percentage%` | Total percentage bonus | §a+200% |
+| `%boosters_any_active%` | Any booster active | §aActivo / §cInactivo |
+
+### Scoreboard Example
+
+```yaml
+scoreboard:
+  lines:
+    - "&7&m--------------------"
+    - "&6&lBoosters"
+    - "&7Global: %boosters_global_percentage%"
+    - "&7Personal: %boosters_personal_percentage%"
+    - "&7&m--------------------"
+    - "&eCombined: %boosters_combined_multiplier%"
+    - "&7Time: %boosters_global_time%"
+    - "&7&m--------------------"
+```
+
+## Commands
+
+<Accordion title="/booster - Main booster management command">
+  **Permission:** `debentialc.admin.booster`
+  
+  **Subcommands:**
+  - `/booster activate <multiplier> [duration]` - Activate global booster
+  - `/booster deactivate` - Deactivate current global booster
+  - `/booster info` - View current booster status
+  - `/booster give <player> <level>` - Give personal booster to player
+  - `/booster list <player>` - View player's stored boosters
+</Accordion>
+
+<Accordion title="/givetps - Award TPs with boosters">
+  **Permission:** `debentialc.admin.givetps`
+  
+  **Usage:** `/givetps <player> <amount>`
+  
+  Automatically applies active global and personal boosters when awarding TPs.
+</Accordion>
+
+## Data Models
+
+### GlobalBooster Model
+
+**Location:** `boosters/models/GlobalBooster.java:6`
+
+```java
+public class GlobalBooster implements Serializable {
+    private double multiplier;           // e.g., 2.0 for 100% bonus
+    private Instant startTime;           // When activated
+    private Instant endTime;             // When it expires
+    private boolean active;              // Current state
+    private String activatedBy;          // Admin who activated
+    
+    public long getRemainingSeconds() {
+        long remaining = endTime.getEpochSecond() - Instant.now().getEpochSecond();
+        return Math.max(0, remaining);
+    }
+    
+    public boolean hasExpired() {
+        return Instant.now().isAfter(endTime);
+    }
+}
+```
+
+### PersonalBooster Model
+
+**Location:** `boosters/models/PersonalBooster.java:8`
+
+```java
+public class PersonalBooster implements Serializable {
+    private UUID playerId;               // Owner
+    private int level;                   // 1-5 (Minor to Ultimate)
+    private double multiplier;           // Calculated from level
+    private Instant activationTime;      // When player activated it
+    private boolean active;              // Currently active flag
+    private Instant creationTime;        // For storage expiration
+    
+    public String getLevelName() {
+        switch (level) {
+            case 1: return "Minor";
+            case 2: return "Standard";
+            case 3: return "Powerful";
+            case 4: return "Extreme";
+            case 5: return "Ultimate";
+            default: return "Unknown";
+        }
+    }
+}
+```
+
+## Configuration
+
+<Tip>
+All booster settings are configurable at runtime through the `BoosterSettings` class. Changes can be persisted by saving them to your plugin's config file.
+</Tip>
+
+### Default Settings
+
+```java
+// Durations (in seconds)
+globalBoosterDuration = 3600;           // 1 hour
+personalBoosterDuration = 900;          // 15 minutes
+personalBoosterStorageDays = 30;        // 30 days before expiration
+
+// Personal booster levels (percentage bonuses)
+Level 1 (Minor):    +10%
+Level 2 (Standard): +25%
+Level 3 (Powerful): +50%
+Level 4 (Extreme):  +100%
+Level 5 (Ultimate): +200%
+
+// Rank multipliers
+Hakaishin: 2.0x   (+100%)
+Kaio:      1.8x   (+80%)
+Kami:      1.6x   (+60%)
+Kaioshin:  1.5x   (+50%)
+VIP+:      1.4x   (+40%)
+VIP:       1.3x   (+30%)
+Elite:     1.2x   (+20%)
+```
+
+### Modifying Settings Programmatically
+
+```java
+import org.debentialc.boosters.core.BoosterSettings;
+
+// Change global booster default duration to 2 hours
+BoosterSettings.setGlobalBoosterDuration(7200);
+
+// Increase Ultimate booster to 300% (+200% → +300%)
+BoosterSettings.setPersonalBoosterMultiplier(5, 3.0);
+
+// Add custom rank multiplier
+BoosterSettings.setRankMultiplier("moderator", 1.25);
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use the API" icon="code">
+    Always use `BoosterTPAPI` to award TPs instead of directly modifying DBC player data. This ensures boosters are properly applied.
+  </Card>
+  <Card title="Check Expiration" icon="clock">
+    The system auto-checks expiration, but you can manually trigger `GlobalBoosterManager.checkExpiration()` if needed.
+  </Card>
+  <Card title="Thread Safety" icon="shield">
+    All managers use thread-safe data structures. Safe to call from async tasks.
+  </Card>
+  <Card title="Persistence" icon="database">
+    Boosters are automatically saved. Only call save methods if you need immediate persistence.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Booster not applying to TPs">
+  **Symptoms:** Players receive base TPs without multiplier
+  
+  **Solutions:**
+  1. Verify booster is active: `/booster info`
+  2. Check if using `BoosterTPAPI.giveTPsWithBooster()` instead of direct DBC calls
+  3. Ensure PlaceholderAPI is installed if using placeholders
+  4. Check console for initialization errors
+</Accordion>
+
+<Accordion title="Booster disappeared after restart">
+  **Symptoms:** Active booster lost on server restart
+  
+  **Solutions:**
+  1. Check `plugins/Debentialc/data/boosters/global.json` exists
+  2. Verify no errors in console during `loadAllData()`
+  3. Check file permissions on the data directory
+  4. Look for JSON parsing errors in logs
+</Accordion>
+
+<Accordion title="Placeholders showing empty values">
+  **Symptoms:** Placeholder displays blank or not found
+  
+  **Solutions:**
+  1. Ensure PlaceholderAPI is installed and loaded
+  2. Verify placeholder registration in console logs
+  3. Check placeholder syntax: `%boosters_<type>%`
+  4. Try `/papi parse me %boosters_global_active%`
+</Accordion>
+
+## Advanced Usage
+
+### Custom Booster Events
+
+You can hook into the booster system for custom events:
+
+```java
+import org.debentialc.boosters.managers.GlobalBoosterManager;
+import org.bukkit.Bukkit;
+
+// Monitor when global boosters activate
+Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+    if (GlobalBoosterManager.isBoosterActive()) {
+        double multiplier = GlobalBoosterManager.getCurrentMultiplier();
+        long remaining = GlobalBoosterManager.getRemainingSeconds();
+        
+        // Broadcast to all players
+        if (remaining % 600 == 0) { // Every 10 minutes
+            Bukkit.broadcastMessage(
+                String.format("§6Global Booster: §e%.2fx §7(§f%d minutes remaining§7)",
+                    multiplier, remaining / 60)
+            );
+        }
+    }
+}, 20L, 20L);
+```
+
+### Dynamic Rank Multipliers
+
+```java
+import org.debentialc.boosters.core.BoosterSettings;
+import org.bukkit.entity.Player;
+
+public double getPlayerRankMultiplier(Player player) {
+    // Check player's permission groups
+    for (String rank : Arrays.asList("hakaishin", "kaio", "kami", "vip", "elite")) {
+        if (player.hasPermission("rank." + rank)) {
+            return BoosterSettings.getRankMultiplier(rank);
+        }
+    }
+    return 1.0; // Default: no bonus
+}
+```
+
+## Related Systems
+
+<CardGroup cols={2}>
+  <Card title="Custom Items" href="/systems/custom-items">
+    Award custom items with TP bonuses that stack with boosters
+  </Card>
+  <Card title="Raids" href="/systems/raids">
+    Integrate boosters with raid reward systems for bonus TPs
+  </Card>
+</CardGroup>

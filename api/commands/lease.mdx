@@ -1,0 +1,680 @@
+---
+title: Lease Commands
+description: Complete reference for the Debentialc land leasing and sub-terrain rental system
+---
+
+# Lease Commands
+
+The lease system enables terrain owners to rent out portions of their land to other players through formal contracts. Lessees receive a protected sub-terrain with recurring payment cycles.
+
+## Base Command
+
+### /lease
+
+**Aliases:** `arrendamiento`, `arriendo`
+
+**Permission:** `debentialc.claims.terrain.info`
+
+**Usage:** `/lease [subcommand]`
+
+Main command for lease management. Without arguments, opens the visual lease menu.
+
+---
+
+## Contract Creation
+
+### /lease offer
+
+**Usage:** `/lease offer <terrain> <player> <chunks> <price> <days>`
+
+**Owner Only:** Yes
+
+Creates a lease offer from a terrain owner to a potential tenant.
+
+<ParamField path="terrain" type="string" required>
+  ID of your terrain to lease from
+</ParamField>
+
+<ParamField path="player" type="string" required>
+  Username of the player to offer the lease to (must be online)
+</ParamField>
+
+<ParamField path="chunks" type="integer" required>
+  Number of chunks to lease (must be less than total terrain size)
+</ParamField>
+
+<ParamField path="price" type="number" required>
+  Rental price per payment cycle (must be greater than 0)
+</ParamField>
+
+<ParamField path="days" type="integer" required>
+  Payment cycle length in days (configurable min/max: typically 1-30 days)
+</ParamField>
+
+**Requirements:**
+- Must own the terrain
+- Terrain must have minimum chunks (typically 4+)
+- Cannot sublease a sub-terrain
+- Chunks must be at least 1 and less than total terrain size
+
+**Example:**
+
+```bash
+# Offer 10 chunks for $5000 every 7 days
+/lease offer plaza_district Steve 10 5000 7
+```
+
+**Output (sender):**
+
+```
+Oferta enviada. ID del contrato: plaza_district_lease_001
+```
+
+**Output (recipient):**
+
+```
+───────────────────────────────────
+  Oferta de Arrendamiento
+  De: Alex | Terreno: plaza_district
+  Chunks: 10 | Precio: $5000 c/7 días
+  Escribe /lease accept Alex para aceptar
+───────────────────────────────────
+```
+
+<Note>
+  The tenant must use `/lease accept <owner_name>` to accept the offer.
+</Note>
+
+---
+
+### /lease request
+
+**Usage:** `/lease request <terrain> <chunks> <price> <days> <owner>`
+
+Creates a lease request from a player to a terrain owner.
+
+<ParamField path="terrain" type="string" required>
+  ID of the terrain you want to lease from
+</ParamField>
+
+<ParamField path="chunks" type="integer" required>
+  Number of chunks you want to lease
+</ParamField>
+
+<ParamField path="price" type="number" required>
+  Price you're offering per cycle
+</ParamField>
+
+<ParamField path="days" type="integer" required>
+  Desired payment cycle length
+</ParamField>
+
+<ParamField path="owner" type="string" required>
+  Username of the terrain owner
+</ParamField>
+
+**Example:**
+
+```bash
+# Request 8 chunks for $4000 every 5 days
+/lease request plaza_district 8 4000 5 Alex
+```
+
+**Output (sender):**
+
+```
+Solicitud enviada. ID: plaza_district_lease_002
+```
+
+**Output (owner):**
+
+```
+───────────────────────────────────
+  Solicitud de Arrendamiento
+  De: Steve | Terreno: plaza_district
+  Chunks: 8 | Precio ofrecido: $4000 c/5 días
+  Escribe /lease accept Steve para aceptar
+───────────────────────────────────
+```
+
+---
+
+### /lease accept
+
+**Usage:** `/lease accept <player_name>`
+
+Accepts a pending lease contract.
+
+<ParamField path="player_name" type="string" required>
+  Name of the player you have a pending contract with
+</ParamField>
+
+**Example:**
+
+```bash
+# Accept an offer/request from Steve
+/lease accept Steve
+```
+
+**Output:**
+
+```
+Contrato plaza_district_lease_001 aceptado.
+Usa /lease assign Steve para asignar el sub-terreno.
+```
+
+<Note>
+  After accepting, the owner must use `/lease assign` to physically allocate the sub-terrain area in the world.
+</Note>
+
+---
+
+## Sub-Terrain Management
+
+### /lease assign
+
+**Usage:** `/lease assign <tenant_name>`
+
+**Owner Only:** Yes
+
+Enters selection mode to assign a sub-terrain area to a tenant.
+
+<ParamField path="tenant_name" type="string" required>
+  Username of the tenant to assign land to
+</ParamField>
+
+**Selection Mode:**
+
+1. Use the command
+2. Left-click to set first corner
+3. Right-click to set second corner
+4. System validates the selection
+5. Sub-terrain is created if valid
+
+**Example:**
+
+```bash
+/lease assign Steve
+```
+
+**Output:**
+
+```
+───────────────────────────────────
+  Modo de Asignación — plaza_district_lease_001
+  Inquilino: Steve | Chunks: 10
+  Terreno padre: plaza_district [100,200 → 180,280]
+───────────────────────────────────
+```
+
+**Then:**
+- Left-click a block for corner 1
+- Right-click a block for corner 2
+
+**Validation checks:**
+- Selection must be within parent terrain bounds
+- Selection must match contracted chunk count
+- Cannot overlap existing sub-terrains
+
+**Output (success):**
+
+```
+Sub-terreno asignado correctamente.
+Contrato activado: plaza_district_lease_001
+```
+
+<Warning>
+  Use `/lease cancel` to exit selection mode without assigning.
+</Warning>
+
+---
+
+### /lease move
+
+**Usage:** `/lease move <tenant_name>`
+
+**Owner Only:** Yes
+
+Initiates a relocation of a tenant's sub-terrain.
+
+<ParamField path="tenant_name" type="string" required>
+  Username of the tenant whose land you want to move
+</ParamField>
+
+**Example:**
+
+```bash
+/lease move Steve
+```
+
+**Output:**
+
+```
+───────────────────────────────────
+  Modo de Traslado — steve_subterrain
+  Inquilino: Steve | Chunks: 10
+  Terreno padre: plaza_district [100,200 → 180,280]
+  El inquilino deberá aceptar el traslado.
+───────────────────────────────────
+```
+
+**Then:**
+- Select new location (same as assign mode)
+- Tenant receives notification
+- Tenant must accept or decline
+
+<Note>
+  The tenant must use `/lease movaccept` to confirm the relocation.
+</Note>
+
+---
+
+### /lease movaccept
+
+**Usage:** `/lease movaccept`
+
+**Tenant Only:** Yes
+
+Accepts a pending sub-terrain relocation.
+
+**Example:**
+
+```bash
+/lease movaccept
+```
+
+**Output:**
+
+```
+Traslado aceptado. Tu sub-terreno fue movido.
+```
+
+---
+
+### /lease movdecline
+
+**Usage:** `/lease movdecline`
+
+**Tenant Only:** Yes
+
+Declines a pending sub-terrain relocation.
+
+**Example:**
+
+```bash
+/lease movdecline
+```
+
+**Output:**
+
+```
+Traslado rechazado.
+```
+
+---
+
+### /lease movadmin
+
+**Permission:** `debentialc.claims.admin.manage` (admin)
+
+**Usage:** `/lease movadmin <contract_id>`
+
+Admin command to forcibly relocate a sub-terrain without tenant approval.
+
+<ParamField path="contract_id" type="string" required>
+  Full contract ID to move
+</ParamField>
+
+**Example:**
+
+```bash
+/lease movadmin plaza_district_lease_001
+```
+
+---
+
+### /lease cancel
+
+**Usage:** `/lease cancel`
+
+Exits selection mode without making changes.
+
+**Example:**
+
+```bash
+/lease cancel
+```
+
+**Output:**
+
+```
+Modo de selección cancelado.
+```
+
+---
+
+## Payment Management
+
+### /lease pay
+
+**Usage:** `/lease pay <contract_id>`
+
+**Tenant Only:** Yes
+
+Manually pays the rent for a contract in grace period.
+
+<ParamField path="contract_id" type="string" required>
+  Contract ID to pay for
+</ParamField>
+
+**Example:**
+
+```bash
+/lease pay plaza_district_lease_001
+```
+
+**Output (success):**
+
+```
+Pago realizado. Contrato reactivado.
+```
+
+**Output (insufficient funds):**
+
+```
+Sin fondos. Necesitas $5000.
+```
+
+<Note>
+  Payments are automatically deducted when due. This command is for manual payment during the grace period after a missed payment.
+</Note>
+
+---
+
+## Contract Information
+
+### /lease list
+
+**Usage:** `/lease list`
+
+Lists all your lease contracts (as owner and tenant).
+
+**Example:**
+
+```bash
+/lease list
+```
+
+**Output:**
+
+```
+───────────────────────────────────
+  Como dueño (2):
+  - plaza_district_lease_001 | Inquilino: Steve | Activo
+  - market_square_lease_005 | Inquilino: Alex | Activo ⟳
+  
+  Como inquilino (1):
+  - downtown_lease_003 | Dueño: Bob | Activo
+───────────────────────────────────
+```
+
+**Status indicators:**
+- **Activo** - Contract is active and paid
+- **⟳** - Pending relocation approval
+- **Período de gracia** - Payment missed, in grace period
+- **Pendiente** - Awaiting acceptance
+
+---
+
+### /lease info
+
+**Usage:** `/lease info <contract_id>`
+
+Displays detailed information about a specific contract.
+
+<ParamField path="contract_id" type="string" required>
+  Contract ID to view
+</ParamField>
+
+**Example:**
+
+```bash
+/lease info plaza_district_lease_001
+```
+
+**Output:**
+
+```
+───────────────────────────────────
+  ID: plaza_district_lease_001
+  Padre: plaza_district | Sub: steve_subterrain
+  Dueño: Alex | Inquilino: Steve
+  Pago: $5000 c/7 días | Chunks: 10
+  Estado: Activo
+  Próximo pago: 3 día(s)
+───────────────────────────────────
+```
+
+**For contracts in grace period:**
+
+```
+───────────────────────────────────
+  ID: plaza_district_lease_001
+  ...
+  Estado: Período de gracia
+  Gracia termina en: 2 día(s)
+  ⟳ Traslado pendiente de aceptación del inquilino
+───────────────────────────────────
+```
+
+---
+
+### /lease menu
+
+**Usage:** `/lease` or `/lease menu`
+
+Opens the visual lease management menu.
+
+**Example:**
+
+```bash
+/lease
+```
+
+**Output:**
+
+Opens `LeaseMenu` (SmartInventory) with:
+- Create offer/request
+- View active contracts
+- Pending contracts
+- Payment history
+- Quick actions
+
+---
+
+## Administrative Commands
+
+### /lease evict
+
+**Permission:** `debentialc.claims.admin.manage` (admin)
+
+**Usage:** `/lease evict <contract_id>`
+
+Forcibly terminates a lease contract and removes the tenant.
+
+<ParamField path="contract_id" type="string" required>
+  Contract ID to evict
+</ParamField>
+
+**Example:**
+
+```bash
+/lease evict plaza_district_lease_001
+```
+
+**Output:**
+
+```
+Desalojado forzosamente.
+```
+
+<Warning>
+  This immediately:
+  - Cancels the contract
+  - Removes the sub-terrain
+  - Revokes tenant's permissions
+  - Does NOT provide refunds
+</Warning>
+
+---
+
+## Contract Lifecycle
+
+### Contract States
+
+<Accordion title="PENDING_OWNER">
+  **Status:** Awaiting owner acceptance
+  
+  **Description:** A tenant has requested to lease land, and the owner needs to accept.
+  
+  **Actions available:**
+  - Owner: `/lease accept <tenant>`
+  - Tenant: Wait or cancel
+</Accordion>
+
+<Accordion title="PENDING_TENANT">
+  **Status:** Awaiting tenant acceptance
+  
+  **Description:** An owner has offered to lease land, and the tenant needs to accept.
+  
+  **Actions available:**
+  - Tenant: `/lease accept <owner>`
+  - Owner: Wait or cancel
+</Accordion>
+
+<Accordion title="AWAITING_SUBTERRAIN">
+  **Status:** Awaiting sub-terrain assignment
+  
+  **Description:** Both parties have agreed, but the owner hasn't assigned the physical land area yet.
+  
+  **Actions available:**
+  - Owner: `/lease assign <tenant>`
+</Accordion>
+
+<Accordion title="ACTIVE">
+  **Status:** Contract is active
+  
+  **Description:** Sub-terrain is assigned, payments are on schedule.
+  
+  **Next payment:** Displayed in contract info
+  
+  **Actions available:**
+  - Owner: Manage members, relocate tenant
+  - Tenant: Build, pay early if desired
+</Accordion>
+
+<Accordion title="GRACE_PERIOD">
+  **Status:** Payment missed, in grace period
+  
+  **Description:** A payment was missed. Tenant has a grace period (configurable, typically 2-3 days) to pay or face eviction.
+  
+  **Actions available:**
+  - Tenant: `/lease pay <contract_id>`
+  - System: Auto-evict when grace expires
+</Accordion>
+
+<Accordion title="EXPIRED">
+  **Status:** Contract terminated
+  
+  **Description:** Grace period ended without payment. Sub-terrain removed, tenant evicted.
+</Accordion>
+
+<Accordion title="CANCELLED">
+  **Status:** Contract terminated early
+  
+  **Description:** Contract was manually cancelled by owner, admin, or system.
+</Accordion>
+
+---
+
+## Payment Cycles
+
+Payments are automatically processed:
+
+### Automatic Payment
+
+```java
+// Every cycle (e.g., 7 days)
+1. Check tenant's balance
+2. If sufficient:
+   - Deduct rent
+   - Deposit to owner
+   - Reset next payment date
+3. If insufficient:
+   - Enter GRACE_PERIOD
+   - Notify both parties
+   - Start grace timer
+```
+
+### Grace Period
+
+```java
+// During grace period (e.g., 2 days)
+- Tenant can use /lease pay to manually pay
+- If paid: Contract returns to ACTIVE
+- If grace expires:
+  - Contract set to EXPIRED
+  - Sub-terrain removed
+  - Tenant permissions revoked
+  - Both parties notified
+```
+
+---
+
+## Implementation Details
+
+### Source Files
+
+- **LeaseCommand.java** - Line 23: Main lease command handler
+- **LeaseManager.java** - Contract lifecycle and payment processing
+- **LeaseContract.java** - Contract model class
+- **LeaseSelectionListener.java** - Block selection for assignment/relocation
+
+### Minimum Requirements
+
+Configurable constants (typical values):
+
+```java
+MIN_CHUNKS_TO_LEASE = 4      // Minimum parent terrain size
+MIN_CYCLE_DAYS = 1           // Minimum payment cycle
+MAX_CYCLE_DAYS = 30          // Maximum payment cycle
+GRACE_PERIOD_DAYS = 2        // Days after missed payment
+```
+
+### Sub-Terrain Validation
+
+When assigning or moving a sub-terrain:
+
+1. **Bounds check** - Must be fully within parent terrain
+2. **Size check** - Selected area must match contracted chunks
+3. **Overlap check** - Cannot overlap other sub-terrains
+4. **Chunk alignment** - Selection is normalized to chunk boundaries
+
+### Selection Session
+
+The selection system uses:
+
+```java
+LeaseSelectionSession {
+    UUID playerId;
+    String contractId;
+    SessionMode mode;  // ASSIGN or MOVE
+    Location corner1;
+    Location corner2;
+}
+```
+
+- Left-click sets `corner1`
+- Right-click sets `corner2`
+- System validates and creates sub-terrain
+- Use `/lease cancel` to exit

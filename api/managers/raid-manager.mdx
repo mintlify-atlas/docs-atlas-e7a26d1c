@@ -1,0 +1,638 @@
+---
+title: Raid Manager API
+description: Complete API reference for managing raids, cooldowns, and raid storage in Debentialc
+---
+
+## Overview
+
+The Raid system provides a complete dungeon/raid framework for creating instanced PvE content. The system consists of:
+
+- **RaidManager** - Core raid lifecycle management
+- **RaidStorageManager** - Persistence and data management
+- **CooldownManager** - Player cooldown tracking
+
+## RaidManager
+
+Manages the creation, configuration, and state of raids. All methods are static.
+
+### Creating and Managing Raids
+
+#### createRaid(raidName)
+
+Creates a new raid with an auto-generated ID.
+
+```java
+import org.debentialc.raids.managers.RaidManager;
+import org.debentialc.raids.models.Raid;
+
+Raid raid = RaidManager.createRaid("Dragon's Lair");
+player.sendMessage("Created raid: " + raid.getRaidId());
+```
+
+<ParamField path="raidName" type="String" required>
+  Display name for the raid
+</ParamField>
+
+<ResponseField name="Raid" type="Raid">
+  The newly created raid object
+</ResponseField>
+
+#### updateRaid(raid)
+
+Updates an existing raid's configuration.
+
+```java
+Raid raid = RaidManager.getRaidById("raid_1");
+raid.setEnabled(true);
+raid.setCooldownSeconds(3600);
+RaidManager.updateRaid(raid);
+```
+
+<ParamField path="raid" type="Raid" required>
+  The raid object with updated values
+</ParamField>
+
+#### deleteRaid(raidId)
+
+Permanently deletes a raid.
+
+```java
+boolean deleted = RaidManager.deleteRaid("raid_1");
+if (deleted) {
+    player.sendMessage("Raid deleted successfully");
+}
+```
+
+<ResponseField name="success" type="boolean">
+  True if the raid was deleted, false if not found
+</ResponseField>
+
+### Querying Raids
+
+#### getRaidById(raidId)
+
+Retrieves a raid by its unique ID.
+
+```java
+Raid raid = RaidManager.getRaidById("raid_1");
+if (raid != null) {
+    player.sendMessage("Found raid: " + raid.getRaidName());
+}
+```
+
+<ResponseField name="Raid" type="Raid">
+  The raid object, or null if not found
+</ResponseField>
+
+#### getRaidByName(raidName)
+
+Finds the first raid matching the given name (case-insensitive).
+
+```java
+Raid raid = RaidManager.getRaidByName("Dragon's Lair");
+```
+
+#### getAllRaids()
+
+Gets all raids in the system.
+
+```java
+import java.util.List;
+
+List<Raid> allRaids = RaidManager.getAllRaids();
+player.sendMessage("Total raids: " + allRaids.size());
+```
+
+<ResponseField name="raids" type="List<Raid>">
+  List of all raids
+</ResponseField>
+
+#### getEnabledRaids()
+
+Gets only raids that are enabled and properly configured.
+
+```java
+List<Raid> playableRaids = RaidManager.getEnabledRaids();
+for (Raid raid : playableRaids) {
+    player.sendMessage("- " + raid.getRaidName());
+}
+```
+
+#### raidExists(raidId)
+
+Checks if a raid exists.
+
+```java
+if (RaidManager.raidExists("raid_1")) {
+    // Proceed with raid logic
+}
+```
+
+### Raid State Management
+
+#### enableRaid(raidId)
+
+Enables a raid, making it available for players.
+
+```java
+RaidManager.enableRaid("raid_1");
+Bukkit.broadcastMessage("Dragon's Lair raid is now open!");
+```
+
+#### disableRaid(raidId)
+
+Disables a raid, preventing new sessions.
+
+```java
+RaidManager.disableRaid("raid_1");
+```
+
+#### isRaidReadyToPlay(raidId)
+
+Checks if a raid is fully configured and ready.
+
+```java
+if (RaidManager.isRaidReadyToPlay("raid_1")) {
+    startRaidSession(player, "raid_1");
+} else {
+    player.sendMessage("§cThis raid is not properly configured!");
+}
+```
+
+<ResponseField name="ready" type="boolean">
+  True if the raid is enabled, configured, and has waves set up
+</ResponseField>
+
+### Information Retrieval
+
+#### getRaidInfo(raidId)
+
+Gets a formatted information string about a raid.
+
+```java
+String info = RaidManager.getRaidInfo("raid_1");
+player.sendMessage(info);
+```
+
+Example output:
+```
+§6=== Información de Raid ===
+§eID: §fraid_1
+§eNombre: §fDragon's Lair
+§eDescripción: §fDefeat the ancient dragon
+§eOleadas: §f5
+§eJugadores: §f1-4
+§eCooldown: §f3600s
+§eEstado: §fConfigured
+§eConfigured: §f✓
+```
+
+#### getRaidsList()
+
+Gets a formatted list of all raids.
+
+```java
+String list = RaidManager.getRaidsList();
+player.sendMessage(list);
+```
+
+#### getTotalRaids()
+
+Gets the total number of raids.
+
+```java
+int total = RaidManager.getTotalRaids();
+```
+
+#### getTotalEnabledRaids()
+
+Gets the count of enabled raids.
+
+```java
+int enabled = RaidManager.getTotalEnabledRaids();
+```
+
+#### getAllRaidIds()
+
+Gets all raid IDs.
+
+```java
+import java.util.Set;
+
+Set<String> raidIds = RaidManager.getAllRaidIds();
+```
+
+### System Operations
+
+#### clearAllRaids()
+
+Clears all raids from memory (useful for reload operations).
+
+```java
+RaidManager.clearAllRaids();
+```
+
+<Warning>
+  This does not delete saved data, but clears the in-memory cache. Use carefully!
+</Warning>
+
+## CooldownManager
+
+Manages per-player, per-raid cooldowns with automatic persistence.
+
+### Setting and Checking Cooldowns
+
+#### setCooldown(playerId, raidId, durationSeconds)
+
+Sets a cooldown for a player on a specific raid.
+
+```java
+import org.debentialc.raids.managers.CooldownManager;
+import java.util.UUID;
+
+UUID playerId = player.getUniqueId();
+CooldownManager.setCooldown(playerId, "raid_1", 3600); // 1 hour cooldown
+```
+
+<ParamField path="playerId" type="UUID" required>
+  Player's unique ID
+</ParamField>
+
+<ParamField path="raidId" type="String" required>
+  The raid ID
+</ParamField>
+
+<ParamField path="durationSeconds" type="long" required>
+  Cooldown duration in seconds
+</ParamField>
+
+<Note>
+  Cooldowns are automatically saved to disk after being set.
+</Note>
+
+#### hasCooldown(playerId, raidId)
+
+Checks if a player has an active cooldown for a raid.
+
+```java
+if (CooldownManager.hasCooldown(player.getUniqueId(), "raid_1")) {
+    player.sendMessage("§cYou must wait before attempting this raid again!");
+    return;
+}
+```
+
+<ResponseField name="hasCooldown" type="boolean">
+  True if the player has an active cooldown
+</ResponseField>
+
+#### getCooldownRemaining(playerId, raidId)
+
+Gets the remaining cooldown time in seconds.
+
+```java
+long remaining = CooldownManager.getCooldownRemaining(player.getUniqueId(), "raid_1");
+if (remaining > 0) {
+    player.sendMessage("Cooldown: " + remaining + " seconds");
+}
+```
+
+<ResponseField name="seconds" type="long">
+  Remaining seconds (0 if no cooldown)
+</ResponseField>
+
+#### getCooldownFormattedTime(playerId, raidId)
+
+Gets a human-readable cooldown time string.
+
+```java
+String time = CooldownManager.getCooldownFormattedTime(player.getUniqueId(), "raid_1");
+player.sendMessage("Cooldown: " + time); // "1h 25m 30s"
+```
+
+### Managing Cooldowns
+
+#### clearCooldown(playerId, raidId)
+
+Removes a specific cooldown for a player.
+
+```java
+CooldownManager.clearCooldown(player.getUniqueId(), "raid_1");
+player.sendMessage("§aCooldown cleared!");
+```
+
+#### clearAllPlayerCooldowns(playerId)
+
+Removes all cooldowns for a specific player.
+
+```java
+CooldownManager.clearAllPlayerCooldowns(player.getUniqueId());
+```
+
+#### clearAllCooldowns()
+
+Clears all cooldowns for all players (admin operation).
+
+```java
+CooldownManager.clearAllCooldowns();
+Bukkit.broadcastMessage("§aAll raid cooldowns have been reset!");
+```
+
+### Querying Player Cooldowns
+
+#### getPlayerCooldowns(playerId)
+
+Gets all active cooldowns for a player.
+
+```java
+import java.util.Map;
+
+Map<String, Long> cooldowns = CooldownManager.getPlayerCooldowns(player.getUniqueId());
+for (Map.Entry<String, Long> entry : cooldowns.entrySet()) {
+    String raidId = entry.getKey();
+    long endTime = entry.getValue();
+    player.sendMessage("- " + raidId + ": expires at " + endTime);
+}
+```
+
+<ResponseField name="cooldowns" type="Map<String, Long>">
+  Map of raid IDs to cooldown end timestamps (milliseconds)
+</ResponseField>
+
+#### getCooldownSummary(playerId)
+
+Gets a formatted summary of all player cooldowns.
+
+```java
+String summary = CooldownManager.getCooldownSummary(player.getUniqueId());
+player.sendMessage(summary);
+```
+
+Example output:
+```
+§6=== Cooldowns Activos ===
+§eraid_1: §f1h 30m 45s
+§eraid_3: §f45m 12s
+```
+
+#### hasAnyCooldown(playerId)
+
+Checks if a player has any active cooldowns.
+
+```java
+if (CooldownManager.hasAnyCooldown(player.getUniqueId())) {
+    player.sendMessage("You have active raid cooldowns");
+}
+```
+
+#### getTotalActiveCooldowns(playerId)
+
+Gets the number of active cooldowns for a player.
+
+```java
+int count = CooldownManager.getTotalActiveCooldowns(player.getUniqueId());
+```
+
+#### getTotalCooldowns()
+
+Gets the total number of cooldowns across all players.
+
+```java
+int total = CooldownManager.getTotalCooldowns();
+```
+
+### Persistence
+
+#### saveCooldowns()
+
+Manually saves all cooldowns to disk.
+
+```java
+CooldownManager.saveCooldowns();
+```
+
+<Note>
+  Cooldowns are automatically saved when set or cleared. Manual saving is usually not needed.
+</Note>
+
+#### loadCooldowns()
+
+Loads cooldowns from disk.
+
+```java
+CooldownManager.loadCooldowns();
+```
+
+## RaidStorageManager
+
+Handles persistence of raid data, cooldowns, and system state.
+
+### Saving and Loading Raids
+
+#### saveAllRaids()
+
+Saves all raids to JSON file.
+
+```java
+import org.debentialc.raids.managers.RaidStorageManager;
+
+RaidStorageManager.saveAllRaids();
+```
+
+#### loadAllRaids()
+
+Loads all raids from JSON file.
+
+```java
+RaidStorageManager.loadAllRaids();
+```
+
+#### saveRaid(raid)
+
+Saves an individual raid to its own directory.
+
+```java
+Raid raid = RaidManager.getRaidById("raid_1");
+RaidStorageManager.saveRaid(raid);
+```
+
+#### loadRaid(raidId)
+
+Loads a specific raid from disk.
+
+```java
+Raid raid = RaidStorageManager.loadRaid("raid_1");
+if (raid != null) {
+    RaidManager.updateRaid(raid);
+}
+```
+
+### File Operations
+
+#### deleteRaidFiles(raidId)
+
+Deletes all files associated with a raid.
+
+```java
+RaidStorageManager.deleteRaidFiles("raid_1");
+```
+
+#### backupRaids()
+
+Creates a timestamped backup of all raid data.
+
+```java
+RaidStorageManager.backupRaids();
+player.sendMessage("§aRaid data backed up successfully!");
+```
+
+<Tip>
+  Backups are stored in `plugins/Debentialc/data/raids/backup_<timestamp>/`
+</Tip>
+
+#### cleanup()
+
+Removes orphaned raid directories that no longer have corresponding raids.
+
+```java
+RaidStorageManager.cleanup();
+```
+
+### System Data
+
+#### saveRaidSystemData()
+
+Saves system-wide raid statistics.
+
+```java
+RaidStorageManager.saveRaidSystemData();
+```
+
+Saves data including:
+- Total raids
+- Total enabled raids
+- Active sessions
+- Player counts
+- Last save time
+
+#### loadRaidSystemData()
+
+Loads system statistics.
+
+```java
+import java.util.Map;
+
+Map<String, Object> data = RaidStorageManager.loadRaidSystemData();
+int totalRaids = ((Double) data.get("totalRaids")).intValue();
+```
+
+## Complete Example: Raid Entry System
+
+Here's a complete example showing how to implement a raid entry system:
+
+```java
+import org.bukkit.entity.Player;
+import org.debentialc.raids.managers.RaidManager;
+import org.debentialc.raids.managers.CooldownManager;
+import org.debentialc.raids.models.Raid;
+
+public class RaidEntryManager {
+    
+    public boolean canEnterRaid(Player player, String raidId) {
+        // Check if raid exists and is ready
+        if (!RaidManager.isRaidReadyToPlay(raidId)) {
+            player.sendMessage("§cThis raid is not available!");
+            return false;
+        }
+        
+        // Check cooldown
+        if (CooldownManager.hasCooldown(player.getUniqueId(), raidId)) {
+            String remaining = CooldownManager.getCooldownFormattedTime(
+                player.getUniqueId(), raidId
+            );
+            player.sendMessage("§cCooldown: " + remaining);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    public void enterRaid(Player player, String raidId) {
+        if (!canEnterRaid(player, raidId)) {
+            return;
+        }
+        
+        Raid raid = RaidManager.getRaidById(raidId);
+        
+        // Start raid session...
+        startRaidSession(player, raid);
+        
+        // Set cooldown after entry
+        CooldownManager.setCooldown(
+            player.getUniqueId(),
+            raidId,
+            raid.getCooldownSeconds()
+        );
+        
+        player.sendMessage("§aEntering raid: " + raid.getRaidName());
+    }
+    
+    public void displayAvailableRaids(Player player) {
+        player.sendMessage("§6=== Available Raids ===");
+        
+        for (Raid raid : RaidManager.getEnabledRaids()) {
+            boolean onCooldown = CooldownManager.hasCooldown(
+                player.getUniqueId(),
+                raid.getRaidId()
+            );
+            
+            if (onCooldown) {
+                String time = CooldownManager.getCooldownFormattedTime(
+                    player.getUniqueId(),
+                    raid.getRaidId()
+                );
+                player.sendMessage("§c" + raid.getRaidName() + " §7(Cooldown: " + time + ")");
+            } else {
+                player.sendMessage("§a" + raid.getRaidName() + " §7(Available)");
+            }
+        }
+    }
+    
+    private void startRaidSession(Player player, Raid raid) {
+        // Implementation depends on your raid session system
+    }
+}
+```
+
+## Storage Locations
+
+All raid data is stored in:
+
+<CodeGroup>
+```bash Main Directory
+plugins/Debentialc/data/raids/
+├── raids.json              # All raid configurations
+├── cooldowns.json          # Player cooldowns
+├── system_data.json        # System statistics
+├── raid_<id>/              # Individual raid directories
+│   └── config.json
+└── backup_<timestamp>/     # Backup directories
+```
+</CodeGroup>
+
+## Best Practices
+
+<Tip>
+  **Cooldown Management**: Always check cooldowns before allowing raid entry to prevent abuse.
+</Tip>
+
+<Note>
+  **Auto-Save**: Cooldowns are automatically saved when modified. Raids should be manually saved after configuration changes.
+</Note>
+
+<Warning>
+  **Thread Safety**: RaidManager and CooldownManager use concurrent collections and are thread-safe.
+</Warning>
+
+<Tip>
+  **Backup Strategy**: Use `backupRaids()` before making major changes to raid configurations.
+</Tip>

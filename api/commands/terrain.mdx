@@ -1,0 +1,581 @@
+---
+title: Terrain Commands
+description: Complete reference for the Debentialc land claims and territory management system
+---
+
+# Terrain Commands
+
+The terrain system allows administrators to create purchasable land plots with customizable permissions and member management. Players can buy, sell, and manage territories with protected building zones.
+
+## Base Command
+
+### /terrain
+
+**Aliases:** `t`
+
+**Permission:** `debentialc.claims.terrain.info` (base)
+
+**Usage:** `/terrain <subcommand>`
+
+Main command for terrain management. Without arguments, displays the help menu.
+
+---
+
+## Terrain Creation
+
+### /terrain create
+
+**Permission:** `debentialc.claims.terrain.create`
+
+**Usage:** `/terrain create <id> <chunks>`
+
+Creates a new terrain template with specified size.
+
+<ParamField path="id" type="string" required>
+  Unique identifier for the terrain
+</ParamField>
+
+<ParamField path="chunks" type="integer" required>
+  Size in chunks (1 chunk = 16x16 blocks). Must be at least 1.
+</ParamField>
+
+**Example:**
+
+```bash
+# Create a 5-chunk terrain
+/terrain create plot_01 5
+```
+
+**Output:**
+
+```
+Terreno plot_01 creado. Tamaño: 5 chunk(s).
+```
+
+<Note>
+  Creating a terrain only defines the template. Use `/terrain commit` to generate it in the world at your location.
+</Note>
+
+---
+
+### /terrain price
+
+**Permission:** `debentialc.claims.terrain.price`
+
+**Usage:** `/terrain price <id> <price>`
+
+Sets the purchase price for a terrain.
+
+<ParamField path="id" type="string" required>
+  ID of the terrain to price
+</ParamField>
+
+<ParamField path="price" type="number" required>
+  Price in server currency (must be non-negative)
+</ParamField>
+
+**Example:**
+
+```bash
+# Set price to $50,000
+/terrain price plot_01 50000
+```
+
+**Output:**
+
+```
+Precio del terreno plot_01 actualizado a $50000.
+```
+
+<Note>
+  If the terrain is already committed (generated in world), this will also update the sign showing the price.
+</Note>
+
+---
+
+### /terrain commit
+
+**Permission:** `debentialc.claims.terrain.commit`
+
+**Usage:** `/terrain commit <id>`
+
+Generates the terrain borders in the world at your current location.
+
+<ParamField path="id" type="string" required>
+  ID of the terrain to commit
+</ParamField>
+
+**Requirements:**
+- Terrain must not already be committed
+- Location must not collide with existing terrains
+- Must maintain minimum buffer distance from other terrains
+
+**Example:**
+
+```bash
+# Stand at desired location, then:
+/terrain commit plot_01
+```
+
+**Output (success):**
+
+```
+Terreno plot_01 generado en tu posición actual.
+```
+
+**Output (collision):**
+
+```
+No se puede generar el terreno aquí.
+Se choca con el terreno plot_02 o está a menos de 5 bloques de distancia.
+```
+
+<Warning>
+  Once committed, the terrain borders are placed in the world with signs. The location cannot be changed without deleting and recreating.
+</Warning>
+
+---
+
+## Terrain Information
+
+### /terrain info
+
+**Permission:** `debentialc.claims.terrain.info`
+
+**Usage:** `/terrain info [id]`
+
+Displays information about a terrain.
+
+<ParamField path="id" type="string">
+  (Optional) Terrain ID to check. If omitted, checks the terrain at your current location.
+</ParamField>
+
+**Example:**
+
+```bash
+# Check terrain you're standing in
+/terrain info
+
+# Check specific terrain by ID
+/terrain info plot_01
+```
+
+**Output:**
+
+```
+────────────────────────────────────
+  Terreno plot_01
+  Tamaño: 5 chunk(s) (80x80)
+  Precio: $50000
+  Propietario: Steve
+  Miembros: 2
+────────────────────────────────────
+```
+
+**Output (for sale):**
+
+```
+────────────────────────────────────
+  Terreno plot_01
+  Tamaño: 5 chunk(s) (80x80)
+  Precio: $50000
+  Estado: En venta
+────────────────────────────────────
+```
+
+---
+
+### /terrain list
+
+**Permission:** `debentialc.claims.terrain.info`
+
+**Usage:** `/terrain list`
+
+Lists all registered terrains.
+
+**Example:**
+
+```bash
+/terrain list
+```
+
+**Output:**
+
+```
+───────────────────────────────────
+  Terrenos registrados:
+  - plot_01 | Steve
+  - plot_02 | En venta
+  - plot_03 | Alex
+  - plot_04 | En venta (sin generar)
+───────────────────────────────────
+```
+
+---
+
+## Member Management
+
+### /terrain member
+
+**Permission:** `debentialc.claims.terrain.member`
+
+**Usage:** `/terrain member <id> <player> <role>`
+
+**Owner Only:** Yes (unless admin)
+
+Grants a player permissions on your terrain.
+
+<ParamField path="id" type="string" required>
+  Terrain ID
+</ParamField>
+
+<ParamField path="player" type="string" required>
+  Player username (must be online)
+</ParamField>
+
+<ParamField path="role" type="string" required>
+  Permission role: `build`, `break`, `containers`, or `all`
+</ParamField>
+
+**Roles:**
+- **BUILD** - Can place blocks
+- **BREAK** - Can break blocks
+- **CONTAINERS** - Can open chests, furnaces, etc.
+- **ALL** - Full permissions (build + break + containers)
+
+**Example:**
+
+```bash
+# Grant building permission
+/terrain member plot_01 Alex build
+
+# Grant all permissions
+/terrain member plot_01 Steve all
+
+# Grant container access only
+/terrain member plot_01 Bob containers
+```
+
+**Output:**
+
+```
+Alex ahora tiene permiso build en el terreno plot_01.
+```
+
+<Note>
+  Members can be granted multiple roles by running the command multiple times with different roles.
+</Note>
+
+---
+
+### /terrain kick
+
+**Permission:** `debentialc.claims.terrain.kick`
+
+**Usage:** `/terrain kick <id> <player>`
+
+**Owner Only:** Yes (unless admin)
+
+Removes a player's permissions from your terrain.
+
+<ParamField path="id" type="string" required>
+  Terrain ID
+</ParamField>
+
+<ParamField path="player" type="string" required>
+  Player username (must be online)
+</ParamField>
+
+**Example:**
+
+```bash
+/terrain kick plot_01 Alex
+```
+
+**Output:**
+
+```
+Alex fue removido del terreno plot_01.
+```
+
+---
+
+## Ownership Management
+
+### /terrain transfer
+
+**Permission:** `debentialc.claims.terrain.transfer`
+
+**Usage:** `/terrain transfer <id> <player>`
+
+**Owner Only:** Yes (unless admin)
+
+Transfers ownership of your terrain to another player.
+
+<ParamField path="id" type="string" required>
+  Terrain ID
+</ParamField>
+
+<ParamField path="player" type="string" required>
+  New owner's username (must be online)
+</ParamField>
+
+**Example:**
+
+```bash
+/terrain transfer plot_01 Steve
+```
+
+**Output (sender):**
+
+```
+Terreno plot_01 transferido a Steve.
+```
+
+**Output (recipient):**
+
+```
+Ahora eres propietario del terreno plot_01.
+```
+
+<Warning>
+  This permanently transfers ownership. The previous owner loses all control over the terrain.
+</Warning>
+
+---
+
+### /terrain sell
+
+**Permission:** `debentialc.claims.terrain.sell`
+
+**Usage:** `/terrain sell <id>`
+
+**Owner Only:** Yes (unless admin)
+
+Returns your terrain to the server for resale.
+
+<ParamField path="id" type="string" required>
+  Terrain ID to sell
+</ParamField>
+
+**Example:**
+
+```bash
+/terrain sell plot_01
+```
+
+**Output:**
+
+```
+Terreno puesto a la venta. Reembolso: $25000.
+```
+
+<Note>
+  - Refund is 50% of the terrain's purchase price
+  - All members are removed
+  - Terrain becomes available for purchase again
+  - Sign is updated to show "For Sale"
+</Note>
+
+---
+
+## Administrative Commands
+
+### /terrain delete
+
+**Permission:** `debentialc.claims.terrain.delete` (admin)
+
+**Usage:** `/terrain delete <id>`
+
+Permanently removes a terrain from the world and registry.
+
+<ParamField path="id" type="string" required>
+  Terrain ID to delete
+</ParamField>
+
+**Example:**
+
+```bash
+/terrain delete plot_01
+```
+
+**Output:**
+
+```
+Terreno plot_01 eliminado. Los bordes fueron removidos del mundo.
+```
+
+<Warning>
+  This permanently deletes the terrain, including:
+  - Border blocks in the world
+  - Signs
+  - All ownership and member data
+  - Registry entry
+  
+  This action cannot be undone.
+</Warning>
+
+---
+
+### /terrain dissolve
+
+**Permission:** `debentialc.claims.terrain.dissolve` (admin)
+
+**Usage:** `/terrain dissolve <id>`
+
+Resets a terrain's ownership without deleting it.
+
+<ParamField path="id" type="string" required>
+  Terrain ID to dissolve
+</ParamField>
+
+**Example:**
+
+```bash
+/terrain dissolve plot_01
+```
+
+**Output:**
+
+```
+Terreno plot_01 disuelto. El propietario Steve fue removido. El terreno vuelve a estar en venta.
+```
+
+<Note>
+  This is useful for reclaiming abandoned or problematic territories without removing the terrain itself. The terrain remains in the world and can be purchased again.
+</Note>
+
+---
+
+## Territory Menu
+
+### /territory
+
+**Aliases:** `tm`
+
+**Permission:** `debentialc.claims.terrain.info`
+
+**Usage:** `/territory` or `/territory menu`
+
+Opens the visual territory management menu.
+
+**Example:**
+
+```bash
+/territory
+/tm
+```
+
+**Output:**
+
+Opens `TerritoryMenu` (SmartInventory) with:
+- View owned territories
+- Available territories for purchase
+- Purchase interface
+- Member management
+- Quick terrain info
+
+<Note>
+  This provides a GUI alternative to command-based terrain management.
+</Note>
+
+---
+
+## Help Command
+
+### /terrain help
+
+**Usage:** `/terrain` (no args)
+
+Displays the terrain command help menu.
+
+**Output:**
+
+```
+───────────────────────────────────
+  Comandos de Terreno
+───────────────────────────────────
+  /terrain create <id> <chunks>
+  /terrain price <id> <precio>
+  /terrain commit <id>
+  /terrain info [id]
+  /terrain member <id> <jugador> <rol>
+  /terrain kick <id> <jugador>
+  /terrain transfer <id> <jugador>
+  /terrain sell <id>
+  /terrain list
+  /terrain delete <id> (Admin)
+  /terrain dissolve <id> (Admin)
+───────────────────────────────────
+```
+
+---
+
+## Implementation Details
+
+### Source Files
+
+- **TerrainCommand.java** - Line 19: Main terrain command handler
+- **TerritoryMenuCommand.java** - Line 15: Visual menu command
+- **TerrainManager.java** - Core terrain logic and validation
+- **Terrain.java** - Terrain model class
+
+### Chunk Calculations
+
+```java
+// 1 chunk = 16x16 blocks
+// Terrain with 5 chunks = 5 * 16 = 80 blocks per side
+// Total area = 80 * 80 = 6,400 blocks
+
+int sizeInBlocks = chunks * 16;
+```
+
+### Collision Detection
+
+When committing a terrain, the system checks:
+
+1. **Direct overlap** - Does the new terrain overlap any existing terrain's bounds?
+2. **Buffer distance** - Is the new terrain at least N blocks away from all existing terrains?
+
+The buffer distance is configurable via `TerrainManager.getBuffer()`.
+
+### Permission System
+
+Members can have multiple role flags:
+
+```java
+public enum MemberRole {
+    BUILD,      // Can place blocks
+    BREAK,      // Can break blocks
+    CONTAINERS, // Can access chests/furnaces
+    ALL         // All permissions
+}
+```
+
+Permissions are checked during block place/break and container open events.
+
+### Purchase Flow
+
+1. Player finds a terrain with "For Sale" sign
+2. Right-clicks the sign (or uses `/territory` menu)
+3. System checks:
+   - Terrain is available (no owner)
+   - Player has sufficient funds
+4. Deducts price from player's balance
+5. Sets player as owner
+6. Updates sign to show owner's name
+
+### Economy Integration
+
+The terrain system integrates with Vault economy:
+
+```java
+// Check balance
+boolean canAfford = economy.has(player, price);
+
+// Withdraw funds
+economy.withdrawPlayer(player, price);
+
+// Refund (50% on sell)
+economy.depositPlayer(player, price / 2);
+```

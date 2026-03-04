@@ -1,0 +1,569 @@
+---
+title: 'Frequently Asked Questions'
+description: 'Common questions about the Debentialc plugin'
+---
+
+## General Questions
+
+<AccordionGroup>
+  <Accordion title="What is Debentialc?">
+    Debentialc is a comprehensive Bukkit/Spigot plugin framework designed for Dragon Block C (DBC) servers. It provides:
+    
+    - **Booster System** - Global and personal multiplier boosters
+    - **Raids System** - Cooperative PvE raid instances
+    - **Claims System** - Territory management with customization
+    - **Custom Items** - Advanced item and armor systems
+    - **PlaceholderAPI Integration** - Extensive placeholder support
+    
+    It's specifically designed to work with CustomNPCs and DBC mod but can function independently for many features.
+  </Accordion>
+
+  <Accordion title="What Minecraft versions are supported?">
+    The plugin is built for **Bukkit/Spigot** servers. Specific version compatibility depends on your server setup:
+    
+    - Requires Java 8 or higher
+    - Works with Spigot/Paper 1.12.2 (common for DBC servers)
+    - May work on newer versions but primarily tested on 1.12.2
+    
+    <Tip>
+      Dragon Block C servers typically run 1.7.10 - 1.12.2, so the plugin is optimized for these versions.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="Do I need CustomNPCs installed?">
+    **Not for all features**:
+    
+    | Feature | Requires CustomNPCs |
+    |---------|--------------------|
+    | Booster System | ❌ No |
+    | Claims/Terrain | ❌ No |
+    | Custom Items | ❌ No |
+    | Raids System | ✅ Yes (for NPC spawning) |
+    | DBC Placeholders | ✅ Yes (`level`, `tps`, etc.) |
+    | TP Boosters | ✅ Yes |
+    
+    The plugin will work without CustomNPCs but with limited functionality.
+    
+    **Source**: `Main.java:107-129`
+  </Accordion>
+
+  <Accordion title="Is PlaceholderAPI required?">
+    **Recommended but not required**:
+    
+    - Plugin works without PlaceholderAPI
+    - Placeholder integration requires PlaceholderAPI
+    - Many features depend on placeholders for display
+    
+    **Install from**: [SpigotMC PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/)
+  </Accordion>
+
+  <Accordion title="Can I use this without Dragon Block C?">
+    **Yes, partially**:
+    
+    - Booster system works standalone
+    - Claims system works standalone
+    - Custom items work standalone
+    - Raids require CustomNPCs but not necessarily DBC
+    - DBC-specific features (TP system) won't work
+    
+    You can use Debentialc as a general-purpose plugin framework even on non-DBC servers.
+  </Accordion>
+</AccordionGroup>
+
+## Booster System
+
+<AccordionGroup>
+  <Accordion title="How do global boosters work?">
+    **Global boosters** affect all online players:
+    
+    1. Admin activates: `/booster global activate 50% 1h`
+    2. All players get 50% bonus for 1 hour
+    3. Multiplier applies to configured systems (TP gains, exp, etc.)
+    4. Automatically deactivates when timer expires
+    
+    **Multiplier calculation**:
+    - `50%` = 1.5x multiplier (base + 50%)
+    - `100%` = 2.0x multiplier (base + 100%)
+    - `250%` = 3.5x multiplier (base + 250%)
+    
+    **Source**: `BoosterCommand.java:78-125`
+  </Accordion>
+
+  <Accordion title="How do personal boosters work?">
+    **Personal boosters** are consumable items:
+    
+    1. Admin gives booster: `/booster personal add PlayerName 3`
+    2. Player receives booster in inventory (data-based)
+    3. Player activates: `/booster personal activate 0`
+    4. Bonus applies only to that player
+    5. Expires after configured duration
+    
+    **Levels**:
+    - Level 1: +15% (1.15x)
+    - Level 2: +30% (1.30x)
+    - Level 3: +60% (1.60x)
+    - Level 4: +120% (2.20x)
+    - Level 5: +250% (3.50x)
+    
+    **Source**: `BoosterSettings.java`
+  </Accordion>
+
+  <Accordion title="Do boosters stack?">
+    **Yes, multiplicatively**:
+    
+    ```
+    Global: 2.0x (100% bonus)
+    Personal: 1.5x (50% bonus)
+    Combined: 2.0 × 1.5 = 3.0x (200% total bonus)
+    ```
+    
+    **Example calculation**:
+    ```
+    Base TPs: 1000
+    With global (2.0x): 2000
+    With personal (1.5x): 1500
+    With both: 3000
+    ```
+    
+    Use `%boosters_combined_multiplier%` placeholder to see total.
+    
+    **Source**: `BoosterUtils.java:calculateCombinedMultiplier()`
+  </Accordion>
+
+  <Accordion title="Can players have multiple personal boosters?">
+    **Yes**, players can have multiple boosters in inventory:
+    
+    - View with `/booster personal list`
+    - Shows all available boosters
+    - Can only activate one at a time
+    - Others remain available for later use
+    
+    **Example**:
+    ```
+    [0] Epic - +120% (Available)
+    [1] Rare - +60% (Available)
+    [2] Legendary - +250% (Available)
+    ```
+    
+    **Source**: `BoosterCommand.java:261-276`
+  </Accordion>
+
+  <Accordion title="What happens to active boosters on restart?">
+    **Global boosters**: Persist if time remaining
+    
+    - Saved on shutdown
+    - Loaded on startup
+    - Continues counting down
+    - Only if not expired
+    
+    **Personal boosters**: Persist per player
+    
+    - Saved when player logs out
+    - Loaded when player joins
+    - Active boosters continue
+    - Expires if time runs out while offline
+    
+    **Source**: `BoosterStorage.java:89-102`
+  </Accordion>
+
+  <Accordion title="How do I integrate boosters with my systems?">
+    **For developers**:
+    
+    ```java
+    import org.debentialc.boosters.core.BoosterUtils;
+    
+    // Get combined multiplier for player
+    double multiplier = BoosterUtils.calculateCombinedMultiplier(player.getUniqueId());
+    
+    // Apply to your calculations
+    int boostedValue = (int) (baseValue * multiplier);
+    
+    // Check if any booster active
+    boolean hasBooster = multiplier > 1.0;
+    ```
+    
+    **For server owners**: Configure which systems use boosters in your other plugins.
+  </Accordion>
+</AccordionGroup>
+
+## Raids System
+
+<AccordionGroup>
+  <Accordion title="What are raids?">
+    **Raids** are cooperative PvE instances:
+    
+    - Party of 2-5 players
+    - Fight waves of CustomNPCs enemies
+    - Defeat all waves to win
+    - Receive rewards on completion
+    - Cooldown prevents spam
+    
+    **Workflow**:
+    1. Create party: `/party create`
+    2. Invite players: `/party invite PlayerName`
+    3. Start raid: `/party start dragon_temple`
+    4. Fight waves together
+    5. Collect rewards
+  </Accordion>
+
+  <Accordion title="How many players needed for a raid?">
+    **Minimum**: 2 players (configurable per raid)
+    
+    **Maximum**: 5 players (party size limit)
+    
+    **Source**: `PartyCommand.java:293-295`
+    
+    <Note>
+      Solo raids are not supported by default for balance reasons.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Can multiple parties do the same raid?">
+    **No**, one party per raid at a time:
+    
+    - Prevents instance conflicts
+    - Ensures NPC spawn integrity
+    - Avoids reward duplication
+    
+    Error if occupied: "Otra party ya está haciendo esta raid. Espera a que terminen."
+    
+    **Source**: `PartyCommand.java:327-330`
+  </Accordion>
+
+  <Accordion title="How does raid cooldown work?">
+    **Per-player, per-raid cooldown**:
+    
+    - Starts when raid completes
+    - Applies to all party members
+    - Duration configured per raid
+    - Stored in `cooldowns.json`
+    
+    **Check cooldown**:
+    - Plugin automatically checks on `/party start`
+    - Shows remaining time if on cooldown
+    
+    **Reset cooldown** (admin): Delete entry in `cooldowns.json` or wait for expiration.
+    
+    **Source**: `PartyCommand.java:312-325`
+  </Accordion>
+
+  <Accordion title="What happens if a player leaves during raid?">
+    **Player consequences**:
+    - Removed from party
+    - Raid continues for remaining members
+    - Still gets cooldown if raid was started
+    
+    **Party consequences**:
+    - If below minimum players, raid may fail
+    - Leader disconnect dissolves party
+    
+    **Source**: `PlayerQuitListener.java`
+  </Accordion>
+
+  <Accordion title="How do I create custom raids?">
+    **Admin steps**:
+    
+    1. `/raid create` - Start creation wizard
+    2. Set raid name and ID
+    3. Configure waves (NPCs, spawn points, count)
+    4. Set player spawn point
+    5. Configure rewards
+    6. Set cooldown duration
+    7. Enable raid
+    
+    **Requirements**:
+    - CustomNPCs NPCs must exist
+    - Spawn points must be in loaded chunks
+    - Valid world names
+    
+    See admin guide for detailed walkthrough.
+  </Accordion>
+</AccordionGroup>
+
+## Claims/Terrain System
+
+<AccordionGroup>
+  <Accordion title="What are terrains?">
+    **Terrains** are purchasable claim areas:
+    
+    - Defined size in chunks (e.g., 4 chunks = 64x64 blocks)
+    - Players purchase with economy
+    - Protected from griefing
+    - Customizable (biome, weather, effects)
+    - Can add members with specific permissions
+    
+    **Workflow**:
+    1. Admin creates: `/terrain create shop_1 4`
+    2. Admin sets price: `/terrain price shop_1 50000`
+    3. Admin commits at location: `/terrain commit shop_1`
+    4. Player purchases via sign or command
+    5. Player customizes and manages
+  </Accordion>
+
+  <Accordion title="How big is a terrain?">
+    **Size = chunks × 16 blocks**:
+    
+    | Chunks | Block Size | Area |
+    |--------|------------|------|
+    | 1 | 16x16 | 256 blocks² |
+    | 2 | 32x32 | 1,024 blocks² |
+    | 4 | 64x64 | 4,096 blocks² |
+    | 8 | 128x128 | 16,384 blocks² |
+    
+    **Example**: `/terrain create town_center 8` creates 128x128 block area.
+    
+    **Source**: `Terrain.java:getSizeInBlocks()`
+  </Accordion>
+
+  <Accordion title="Can terrains overlap?">
+    **No**, the system prevents overlaps:
+    
+    - Buffer zone between terrains (default: 16 blocks)
+    - Checked on commit
+    - Error if collision detected
+    
+    **Source**: `TerrainCommand.java:149-155`
+  </Accordion>
+
+  <Accordion title="What member roles are available?">
+    **Four permission levels**:
+    
+    | Role | Can Build | Can Break | Can Use Containers |
+    |------|-----------|-----------|--------------------|
+    | `BUILD` | ✅ Yes | ❌ No | ❌ No |
+    | `BREAK` | ❌ No | ✅ Yes | ❌ No |
+    | `CONTAINERS` | ❌ No | ❌ No | ✅ Yes |
+    | `ALL` | ✅ Yes | ✅ Yes | ✅ Yes |
+    
+    **Add member**: `/terrain member <id> <player> <role>`
+    
+    **Example**: `/terrain member spawn_town Steve BUILD`
+    
+    **Source**: `TerrainCommand.java:219-226`
+  </Accordion>
+
+  <Accordion title="Can I rent out my terrain?">
+    **Yes, via lease system**:
+    
+    1. Owner offers lease: `/lease offer terrain_1 PlayerName 5000 7d`
+    2. Player accepts: `/lease accept`
+    3. Player gets temporary access for 7 days
+    4. Payment to owner
+    5. Auto-expires after duration
+    
+    **Lease benefits**:
+    - Temporary permissions
+    - Automatic expiration
+    - Economy integration
+    - Tracking system
+  </Accordion>
+
+  <Accordion title="What customization options are available?">
+    **Environment customization**:
+    
+    - **Biome**: Change terrain biome
+    - **Floor**: Change ground block type
+    - **Weather**: Lock weather (clear, rain, thunder)
+    - **Time**: Lock time of day
+    - **Game rules**: Custom game rule settings
+    - **Effects**: Apply potion effects to players inside
+    
+    **Permissions required**: `claims.command.terrain.customize.*`
+    
+    See [Permissions](/advanced/permissions#terrain-customization) for details.
+  </Accordion>
+</AccordionGroup>
+
+## Configuration
+
+<AccordionGroup>
+  <Accordion title="Where are configuration files?">
+    ```
+    plugins/Debentialc/
+    ├── config.yml           # Main configuration (if exists)
+    ├── boosters.yml         # Booster settings (if exists)
+    └── data/                # Data storage
+        ├── boosters/
+        ├── raids/
+        └── claims/
+    ```
+    
+    <Note>
+      Some settings are configured in-game via commands rather than config files.
+    </Note>
+  </Accordion>
+
+  <Accordion title="How do I change booster durations?">
+    **Currently hardcoded** in source:
+    
+    - Global booster: Default duration in settings
+    - Personal booster: Default duration in settings
+    
+    **To customize**: Modify `BoosterSettings.java` and recompile, or specify duration in command:
+    
+    ```bash
+    /booster global activate 50% 2h  # 2 hour duration
+    ```
+  </Accordion>
+
+  <Accordion title="Can I change personal booster multipliers?">
+    **Yes, via API**:
+    
+    ```java
+    BoosterSettings.setPersonalBoosterMultiplier(1, 0.15);  // Level 1: 15%
+    BoosterSettings.setPersonalBoosterMultiplier(2, 0.30);  // Level 2: 30%
+    BoosterSettings.setPersonalBoosterMultiplier(3, 0.60);  // Level 3: 60%
+    BoosterSettings.setPersonalBoosterMultiplier(4, 1.20);  // Level 4: 120%
+    BoosterSettings.setPersonalBoosterMultiplier(5, 2.50);  // Level 5: 250%
+    ```
+    
+    **Source**: `Main.java:186-190`
+    
+    <Warning>
+      This requires plugin modification or a separate configuration plugin.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Performance
+
+<AccordionGroup>
+  <Accordion title="Does this plugin lag the server?">
+    **Generally no**, the plugin is lightweight:
+    
+    - Booster calculations are simple math
+    - Storage uses efficient JSON/Properties
+    - Minimal async operations needed
+    - Event listeners are optimized
+    
+    **Potential lag sources**:
+    - Many raids active simultaneously
+    - Excessive placeholder updates
+    - Large number of terrains
+  </Accordion>
+
+  <Accordion title="How much storage space is needed?">
+    **Minimal**:
+    
+    - Global booster: ~1 KB
+    - Personal booster per player: ~500 bytes
+    - Raid config: ~10 KB per raid
+    - Terrain data: ~2 KB per terrain
+    
+    **Example**: 100 players, 10 raids, 50 terrains = ~1 MB total
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Commands not working?">
+    **Check**:
+    1. Plugin enabled: `/plugins` - should be green
+    2. Permissions granted: See [Permissions](/advanced/permissions)
+    3. Command syntax: Use `/booster help` for usage
+    4. Console errors: Check for exceptions
+    
+    See [Troubleshooting](/advanced/troubleshooting) guide.
+  </Accordion>
+
+  <Accordion title="Data not saving?">
+    **Solutions**:
+    1. Check file permissions on `plugins/Debentialc/data/`
+    2. Verify disk space available
+    3. Don't force-kill server (use `/stop`)
+    4. Manual save: `/booster save` and `/raid save`
+    
+    See [Storage](/advanced/storage#troubleshooting-storage-issues) guide.
+  </Accordion>
+
+  <Accordion title="Placeholders not working?">
+    **Checklist**:
+    - ✓ PlaceholderAPI installed
+    - ✓ Server restarted after install
+    - ✓ Expansion registered: `/papi list`
+    - ✓ Test with: `/papi parse me %boosters_global_active%`
+    
+    See [Placeholders](/advanced/placeholders#troubleshooting) guide.
+  </Accordion>
+</AccordionGroup>
+
+## Migration & Updates
+
+<AccordionGroup>
+  <Accordion title="How do I update the plugin?">
+    **Safe update process**:
+    
+    1. **Backup**:
+       ```bash
+       /booster save
+       /raid save
+       cp -r plugins/Debentialc/data ~/backup/
+       ```
+    
+    2. **Stop server**
+    
+    3. **Replace JAR**: 
+       ```bash
+       rm plugins/Debentialc-old.jar
+       cp Debentialc-new.jar plugins/
+       ```
+    
+    4. **Start server**
+    
+    5. **Verify**: Check console for errors, test features
+  </Accordion>
+
+  <Accordion title="Will updates break my data?">
+    **Usually no**, but:
+    
+    - Always backup before updating
+    - Read changelog for breaking changes
+    - Test on development server first
+    - Storage format is generally stable
+    
+    <Warning>
+      Major version updates (1.x → 2.x) may require migration.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Getting Support
+
+<AccordionGroup>
+  <Accordion title="Where can I get help?">
+    1. **Documentation**: Read this docs site thoroughly
+    2. **Troubleshooting**: Check [Troubleshooting Guide](/advanced/troubleshooting)
+    3. **Source code**: Review source files for functionality details
+    4. **Console logs**: Check for error messages and warnings
+  </Accordion>
+
+  <Accordion title="How do I report a bug?">
+    **Include this information**:
+    
+    - Plugin version: `/version Debentialc`
+    - Server version: `/version`
+    - Java version
+    - Other plugins: `/plugins`
+    - Full error from console (use pastebin)
+    - Steps to reproduce
+    - Expected vs actual behavior
+  </Accordion>
+
+  <Accordion title="Can I request features?">
+    **Yes**, feature requests are welcome. Include:
+    
+    - Clear description of desired feature
+    - Use case / why it's needed
+    - How it would work
+    - Any examples from other plugins
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [Quick Start](/quickstart) - Get started quickly
+- [Permissions](/advanced/permissions) - Permission reference
+- [Placeholders](/advanced/placeholders) - Placeholder usage
+- [Storage](/advanced/storage) - Data management
+- [Troubleshooting](/advanced/troubleshooting) - Fix common issues

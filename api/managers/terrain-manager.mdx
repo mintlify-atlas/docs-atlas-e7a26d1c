@@ -1,0 +1,999 @@
+---
+title: Terrain Manager API
+description: Complete API reference for managing land claims, leases, and terrain customization in Debentialc
+---
+
+## Overview
+
+The Terrain (Claims) system provides a complete land claiming solution with lease/rental functionality and extensive customization options. The system consists of:
+
+- **TerrainManager** - Core terrain lifecycle and permissions
+- **LeaseManager** - Rental contracts and sub-terrain management
+- **TerrainCustomizeManager** - Biomes, rules, effects, and customization
+
+## TerrainManager
+
+Manages terrain creation, ownership, permissions, and basic operations.
+
+### Instance Access
+
+```java
+import org.debentialc.claims.managers.TerrainManager;
+import org.debentialc.claims.models.Terrain;
+
+TerrainManager manager = TerrainManager.getInstance();
+```
+
+### Creating and Managing Terrains
+
+#### createTerrain(id, chunks)
+
+Creates a new uncommitted terrain.
+
+```java
+boolean created = manager.createTerrain("spawn_plot_1", 4);
+if (created) {
+    player.sendMessage("§aTerrain created! Use /terrain commit to place it.");
+} else {
+    player.sendMessage("§cA terrain with that ID already exists!");
+}
+```
+
+<ParamField path="id" type="String" required>
+  Unique identifier for the terrain
+</ParamField>
+
+<ParamField path="chunks" type="int" required>
+  Size in chunks (1 chunk = 16x16 blocks)
+</ParamField>
+
+<ResponseField name="success" type="boolean">
+  True if created, false if ID already exists
+</ResponseField>
+
+#### commitTerrain(id, player)
+
+Places a terrain in the world at the player's current chunk.
+
+```java
+Terrain terrain = manager.getTerrain("spawn_plot_1");
+boolean committed = manager.commitTerrain(terrain.getId(), player);
+
+if (committed) {
+    player.sendMessage("§aTerrain placed successfully!");
+} else {
+    player.sendMessage("§cCannot place terrain here (collision detected)");
+}
+```
+
+<ParamField path="id" type="String" required>
+  Terrain ID to commit
+</ParamField>
+
+<ParamField path="player" type="Player" required>
+  Player whose location determines placement
+</ParamField>
+
+<ResponseField name="success" type="boolean">
+  True if placed successfully, false if collision detected or already committed
+</ResponseField>
+
+<Note>
+  Committing builds border slabs and places an information sign at the origin.
+</Note>
+
+#### deleteTerrain(id)
+
+Permanently deletes a terrain, removing borders and signs.
+
+```java
+boolean deleted = manager.deleteTerrain("spawn_plot_1");
+```
+
+#### dissolveTerrain(id)
+
+Removes ownership but keeps the terrain, making it available for purchase.
+
+```java
+boolean dissolved = manager.dissolveTerrain("spawn_plot_1");
+if (dissolved) {
+    manager.updateSign(terrain);
+}
+```
+
+### Querying Terrains
+
+#### getTerrain(id)
+
+Gets a terrain by its ID.
+
+```java
+Terrain terrain = manager.getTerrain("spawn_plot_1");
+if (terrain != null) {
+    player.sendMessage("Owner: " + terrain.getOwnerName());
+}
+```
+
+#### getTerrainAt(location)
+
+Finds the terrain at a specific location.
+
+```java
+import org.bukkit.Location;
+
+Location loc = player.getLocation();
+Terrain terrain = manager.getTerrainAt(loc);
+
+if (terrain != null) {
+    player.sendMessage("You are in terrain: " + terrain.getId());
+} else {
+    player.sendMessage("This is wilderness");
+}
+```
+
+<Tip>
+  This is the most common method for checking if a player is in a claimed area.
+</Tip>
+
+#### getTerrainBySign(location)
+
+Gets the terrain associated with a sign at a location.
+
+```java
+Terrain terrain = manager.getTerrainBySign(signBlock.getLocation());
+if (terrain != null) {
+    // Player clicked a terrain sign
+}
+```
+
+#### getAll()
+
+Gets all terrains in the system.
+
+```java
+import java.util.Map;
+
+Map<String, Terrain> allTerrains = manager.getAll();
+player.sendMessage("Total terrains: " + allTerrains.size());
+```
+
+### Ownership and Economy
+
+#### setPrice(id, price)
+
+Sets the purchase price for a terrain.
+
+```java
+manager.setPrice("spawn_plot_1", 10000.0);
+```
+
+#### purchaseTerrain(terrain, player)
+
+Handles terrain purchase with economy integration.
+
+```java
+Terrain terrain = manager.getTerrain("spawn_plot_1");
+
+if (terrain.hasOwner()) {
+    player.sendMessage("§cThis terrain is already owned!");
+    return;
+}
+
+boolean purchased = manager.purchaseTerrain(terrain, player);
+
+if (purchased) {
+    player.sendMessage("§aCongratulations! You now own " + terrain.getId());
+} else {
+    player.sendMessage("§cYou don't have enough money!");
+}
+```
+
+<ParamField path="terrain" type="Terrain" required>
+  The terrain to purchase
+</ParamField>
+
+<ParamField path="player" type="Player" required>
+  The purchasing player
+</ParamField>
+
+<ResponseField name="success" type="boolean">
+  True if purchase successful, false if insufficient funds or already owned
+</ResponseField>
+
+<Note>
+  Requires Vault economy plugin to be installed.
+</Note>
+
+#### transferOwner(terrain, newOwner, newOwnerName)
+
+Transfers ownership to another player.
+
+```java
+import java.util.UUID;
+
+UUID newOwner = targetPlayer.getUniqueId();
+manager.transferOwner(terrain, newOwner, targetPlayer.getName());
+```
+
+### Permission Checks
+
+#### canInteract(terrain, player)
+
+Checks if a player can interact with blocks (buttons, levers, etc.).
+
+```java
+Terrain terrain = manager.getTerrainAt(block.getLocation());
+
+if (!manager.canInteract(terrain, player)) {
+    event.setCancelled(true);
+    player.sendMessage("§cYou cannot interact here!");
+}
+```
+
+<ResponseField name="allowed" type="boolean">
+  True if player can interact (is owner, has permission, or no terrain)
+</ResponseField>
+
+#### canBuild(terrain, player)
+
+Checks if a player can place blocks.
+
+```java
+if (!manager.canBuild(terrain, player)) {
+    event.setCancelled(true);
+    player.sendMessage("§cYou don't have build permission!");
+}
+```
+
+#### canBreak(terrain, player)
+
+Checks if a player can break blocks.
+
+```java
+if (!manager.canBreak(terrain, player)) {
+    event.setCancelled(true);
+}
+```
+
+#### canOpenContainers(terrain, player)
+
+Checks if a player can open chests, furnaces, etc.
+
+```java
+if (!manager.canOpenContainers(terrain, player)) {
+    event.setCancelled(true);
+    player.sendMessage("§cYou cannot access containers here!");
+}
+```
+
+### Member Management
+
+#### addMember(terrain, uuid, name, role)
+
+Adds a member with specific permissions.
+
+```java
+import org.debentialc.claims.models.Terrain.MemberRole;
+
+manager.addMember(
+    terrain,
+    targetPlayer.getUniqueId(),
+    targetPlayer.getName(),
+    MemberRole.BUILD
+);
+```
+
+<ParamField path="terrain" type="Terrain" required>
+  The terrain to add member to
+</ParamField>
+
+<ParamField path="uuid" type="UUID" required>
+  Player's unique ID
+</ParamField>
+
+<ParamField path="name" type="String" required>
+  Player's name
+</ParamField>
+
+<ParamField path="role" type="MemberRole" required>
+  Permission level: BUILD, BREAK, CONTAINERS, or ALL
+</ParamField>
+
+#### removeMember(terrain, uuid)
+
+Removes a member from a terrain.
+
+```java
+manager.removeMember(terrain, targetPlayer.getUniqueId());
+```
+
+### Collision Detection
+
+#### checkCollision(excludeId, world, ox, oz, size)
+
+Checks if a terrain would collide with existing terrains (includes buffer).
+
+```java
+import org.bukkit.World;
+
+World world = player.getWorld();
+int chunkX = player.getLocation().getChunk().getX() * 16;
+int chunkZ = player.getLocation().getChunk().getZ() * 16;
+int size = 4 * 16; // 4 chunks
+
+String collision = manager.checkCollision(null, world, chunkX, chunkZ, size);
+
+if (collision != null) {
+    player.sendMessage("§cWould collide with terrain: " + collision);
+} else {
+    player.sendMessage("§aPosition is clear!");
+}
+```
+
+#### getCollisionId(id, player, terrain)
+
+Checks for collision at player's current location.
+
+```java
+String collision = manager.getCollisionId(terrain.getId(), player, terrain);
+```
+
+### Sign Management
+
+#### updateSign(terrain)
+
+Updates the terrain's information sign.
+
+```java
+manager.updateSign(terrain);
+```
+
+<Note>
+  Signs automatically update when ownership changes, but you can manually refresh them.
+</Note>
+
+### Utility Methods
+
+#### getBuffer()
+
+Gets the buffer distance between terrains in blocks.
+
+```java
+int buffer = manager.getBuffer(); // Returns 16
+```
+
+#### save(terrain)
+
+Saves a terrain to storage.
+
+```java
+manager.save(terrain);
+```
+
+## LeaseManager
+
+Manages rental contracts for sub-terrains within parent terrains.
+
+### Instance Access
+
+```java
+import org.debentialc.claims.managers.LeaseManager;
+import org.debentialc.claims.models.LeaseContract;
+
+LeaseManager leaseManager = LeaseManager.getInstance();
+```
+
+### Creating Lease Contracts
+
+#### offerContract(parentTerrain, owner, tenantId, tenantName, chunks, price, cycleDays)
+
+Owner offers a lease to a tenant.
+
+```java
+Terrain parent = TerrainManager.getInstance().getTerrain("my_terrain");
+
+LeaseContract contract = leaseManager.offerContract(
+    parent,
+    player,                          // Owner
+    tenant.getUniqueId(),           // Tenant ID
+    tenant.getName(),               // Tenant name
+    2,                              // 2 chunks
+    5000.0,                         // 5000 per cycle
+    7                               // 7 day cycles
+);
+
+if (contract != null) {
+    player.sendMessage("§aLease offer sent to " + tenant.getName());
+    tenant.sendMessage("§6You have a lease offer! Use /lease accept");
+} else {
+    player.sendMessage("§cCannot create lease (terrain too small or invalid settings)");
+}
+```
+
+<ParamField path="parentTerrain" type="Terrain" required>
+  Parent terrain to lease from
+</ParamField>
+
+<ParamField path="owner" type="Player" required>
+  Owner of the parent terrain
+</ParamField>
+
+<ParamField path="tenantId" type="UUID" required>
+  Tenant's UUID
+</ParamField>
+
+<ParamField path="tenantName" type="String" required>
+  Tenant's name
+</ParamField>
+
+<ParamField path="chunks" type="int" required>
+  Size of sub-terrain (must be less than parent)
+</ParamField>
+
+<ParamField path="price" type="double" required>
+  Price per payment cycle
+</ParamField>
+
+<ParamField path="cycleDays" type="int" required>
+  Days between payments (3-20)
+</ParamField>
+
+#### requestContract(parentTerrain, tenant, ownerId, ownerName, chunks, price, cycleDays)
+
+Tenant requests a lease from an owner.
+
+```java
+LeaseContract contract = leaseManager.requestContract(
+    parent,
+    player,                // Tenant
+    owner.getUniqueId(),  // Owner ID
+    owner.getName(),      // Owner name
+    2,                    // 2 chunks
+    5000.0,              // Offer 5000 per cycle
+    7                    // 7 day cycles
+);
+```
+
+### Accepting and Managing Contracts
+
+#### acceptContract(contract, acceptor)
+
+Accepts a pending contract.
+
+```java
+LeaseContract contract = leaseManager.findPendingByPlayerName(
+    player.getUniqueId(),
+    otherPlayer.getName()
+);
+
+if (contract != null) {
+    boolean accepted = leaseManager.acceptContract(contract, player);
+    
+    if (accepted) {
+        player.sendMessage("§aContract accepted! Assign a location for the sub-terrain.");
+    }
+}
+```
+
+#### assignSubTerrainAtPos(contract, owner, world, ox, oz, y)
+
+Places the sub-terrain at a specific location and activates the contract.
+
+```java
+import org.bukkit.World;
+
+World world = player.getWorld();
+int ox = 1000;  // Origin X
+int oz = 1000;  // Origin Z
+int y = 64;     // Y level
+
+boolean assigned = leaseManager.assignSubTerrainAtPos(
+    contract,
+    player,
+    world,
+    ox,
+    oz,
+    y
+);
+
+if (assigned) {
+    player.sendMessage("§aSub-terrain assigned and contract activated!");
+}
+```
+
+<Note>
+  First payment is automatically deducted when the sub-terrain is assigned.
+</Note>
+
+#### cancelContract(contractId, canceller)
+
+Cancels a contract.
+
+```java
+boolean cancelled = leaseManager.cancelContract(contract.getContractId(), player);
+
+if (cancelled) {
+    player.sendMessage("§aContract cancelled");
+}
+```
+
+<Note>
+  Active contracts enter a 3-day grace period. Pending contracts are cancelled immediately.
+</Note>
+
+### Moving Sub-Terrains
+
+#### requestMoveWithSelection(contract, owner, world, ox, oz, y)
+
+Owner requests to move a sub-terrain to a new location.
+
+```java
+leaseManager.requestMoveWithSelection(contract, player, world, newX, newZ, y);
+tenant.sendMessage("§6The owner wants to move your sub-terrain. Use /lease acceptmove or /lease declinemove");
+```
+
+#### acceptMove(contractId, tenant)
+
+Tenant accepts the move request.
+
+```java
+boolean moved = leaseManager.acceptMove(contract.getContractId(), player);
+```
+
+#### declineMove(contractId, tenant)
+
+Tenant declines the move request.
+
+```java
+boolean declined = leaseManager.declineMove(contract.getContractId(), player);
+```
+
+### Querying Contracts
+
+#### getContract(contractId)
+
+Gets a contract by ID.
+
+```java
+LeaseContract contract = leaseManager.getContract("LEASE_PLAYER_TERRAIN_1");
+```
+
+#### getContractsByOwner(ownerId)
+
+Gets all contracts owned by a player.
+
+```java
+import java.util.List;
+
+List<LeaseContract> owned = leaseManager.getContractsByOwner(player.getUniqueId());
+```
+
+#### getContractsByTenant(tenantId)
+
+Gets all contracts where a player is the tenant.
+
+```java
+List<LeaseContract> renting = leaseManager.getContractsByTenant(player.getUniqueId());
+```
+
+#### getPendingForPlayer(playerId)
+
+Gets all pending contracts for a player.
+
+```java
+List<LeaseContract> pending = leaseManager.getPendingForPlayer(player.getUniqueId());
+player.sendMessage("You have " + pending.size() + " pending contracts");
+```
+
+#### findPendingByPlayerName(acceptorId, otherPlayerName)
+
+Finds a pending contract between two players.
+
+```java
+LeaseContract contract = leaseManager.findPendingByPlayerName(
+    player.getUniqueId(),
+    "PlayerName"
+);
+```
+
+#### getContractBySubTerrain(subTerrainId)
+
+Gets the contract associated with a sub-terrain.
+
+```java
+LeaseContract contract = leaseManager.getContractBySubTerrain("parent_TENANT");
+```
+
+#### isSubTerrain(terrainId)
+
+Checks if a terrain is a sub-terrain (part of a lease).
+
+```java
+if (leaseManager.isSubTerrain(terrain.getId())) {
+    // Special handling for sub-terrains
+}
+```
+
+### Validation
+
+#### validateSelectionForAssign(contract, world, ox, oz, size)
+
+Validates if a position is suitable for assigning a sub-terrain.
+
+```java
+String error = leaseManager.validateSelectionForAssign(
+    contract,
+    world,
+    ox,
+    oz,
+    size
+);
+
+if (error != null) {
+    player.sendMessage("§c" + error);
+} else {
+    // Position is valid
+}
+```
+
+#### validateSelectionForMove(contract, world, ox, oz, size)
+
+Validates if a position is suitable for moving a sub-terrain.
+
+```java
+String error = leaseManager.validateSelectionForMove(contract, world, ox, oz, size);
+```
+
+### Payment Management
+
+#### tryPayGrace(contractId)
+
+Attempts to pay during grace period to restore an active contract.
+
+```java
+boolean paid = leaseManager.tryPayGrace(contract.getContractId());
+if (paid) {
+    player.sendMessage("§aPayment successful! Contract restored.");
+}
+```
+
+### Admin Operations
+
+#### forceEvict(contractId, admin)
+
+Force-evicts a tenant immediately.
+
+```java
+if (player.hasPermission("claims.admin.manage")) {
+    leaseManager.forceEvict(contract.getContractId(), player);
+}
+```
+
+#### adminMoveSubTerrain(contractId, admin, world, ox, oz, y)
+
+Admin force-moves a sub-terrain.
+
+```java
+boolean moved = leaseManager.adminMoveSubTerrain(
+    contract.getContractId(),
+    player,
+    world,
+    newX,
+    newZ,
+    y
+);
+```
+
+### Constants
+
+```java
+LeaseManager.MIN_CHUNKS_TO_LEASE;      // 4 chunks minimum
+LeaseManager.MIN_CYCLE_DAYS;           // 3 days
+LeaseManager.MAX_CYCLE_DAYS;           // 20 days
+LeaseManager.GRACE_PERIOD_DAYS;        // 3 days
+LeaseManager.PARENT_BORDER_MARGIN;     // 2 blocks
+```
+
+## TerrainCustomizeManager
+
+Manages terrain customization including biomes, game rules, effects, and environmental settings.
+
+### Initialization
+
+```java
+import org.debentialc.claims.managers.TerrainCustomizeManager;
+
+TerrainCustomizeManager.initialize();
+```
+
+### Biome Management
+
+#### setBiome(terrain, player, biomeName)
+
+Changes the biome of a terrain asynchronously.
+
+```java
+boolean success = TerrainCustomizeManager.setBiome(
+    terrain,
+    player,
+    "PLAINS"
+);
+
+if (success) {
+    player.sendMessage("§aBiome is being changed...");
+}
+```
+
+<ParamField path="terrain" type="Terrain" required>
+  The terrain to modify
+</ParamField>
+
+<ParamField path="player" type="Player" required>
+  Player requesting the change (for feedback)
+</ParamField>
+
+<ParamField path="biomeName" type="String" required>
+  Bukkit biome name (e.g., PLAINS, DESERT, JUNGLE)
+</ParamField>
+
+<Warning>
+  Biome changes are permanent and may take time for large terrains. Players may need to relog to see full changes.
+</Warning>
+
+### Floor Customization
+
+#### setFloor(terrain, player, material, data)
+
+Changes all floor blocks (Y-1) to a specific material.
+
+```java
+import org.bukkit.Material;
+
+TerrainCustomizeManager.setFloor(
+    terrain,
+    player,
+    Material.GRASS,
+    (byte) 0
+);
+```
+
+```java
+// Or using block ID
+TerrainCustomizeManager.setFloor(terrain, player, 2, (byte) 0); // Grass
+```
+
+### Weather Control
+
+#### setWeather(terrain, player, type)
+
+Sets persistent weather for the terrain's world.
+
+```java
+TerrainCustomizeManager.setWeather(terrain, player, "CLEAR");
+// Options: "CLEAR", "RAIN", "STORM"
+```
+
+<Note>
+  Weather changes affect the entire world, not just the terrain.
+</Note>
+
+### Game Rules
+
+#### toggleRule(terrain, player, ruleKey)
+
+Toggles a game rule for the terrain.
+
+```java
+boolean newValue = TerrainCustomizeManager.toggleRule(terrain, player, "pvp");
+player.sendMessage("PvP is now: " + (newValue ? "enabled" : "disabled"));
+```
+
+Available rules:
+- `pvp` - Player vs Player combat
+- `mobGriefing` - Mob block destruction
+- `keepInventory` - Keep items on death
+- `doFireTick` - Fire spread
+- `tntExplodes` - TNT explosions
+- `doMobSpawning` - Natural mob spawning
+- `naturalRegen` - Health regeneration
+- `doHunger` - Hunger depletion
+
+#### getRuleValue(terrain, ruleKey)
+
+Gets the current value of a rule.
+
+```java
+boolean pvpEnabled = TerrainCustomizeManager.getRuleValue(terrain, "pvp");
+```
+
+#### isRuleEnabled(terrainId, ruleKey)
+
+Static method to check rules by terrain ID.
+
+```java
+if (TerrainCustomizeManager.isRuleEnabled(terrain.getId(), "pvp")) {
+    // Allow PvP
+}
+```
+
+#### isPvpEnabled(terrainId)
+
+Convenience method for PvP check.
+
+```java
+if (!TerrainCustomizeManager.isPvpEnabled(terrain.getId())) {
+    event.setCancelled(true);
+    player.sendMessage("§cPvP is disabled in this terrain!");
+}
+```
+
+#### isMobSpawningEnabled(terrainId)
+
+Convenience method for mob spawning check.
+
+```java
+if (!TerrainCustomizeManager.isMobSpawningEnabled(terrain.getId())) {
+    event.setCancelled(true);
+}
+```
+
+### Time Control
+
+#### setTime(terrain, player, ticks)
+
+Sets persistent time for players in the terrain.
+
+```java
+// Set to day (1000 ticks)
+TerrainCustomizeManager.setTime(terrain, player, 1000);
+
+// Set to night (13000 ticks)
+TerrainCustomizeManager.setTime(terrain, player, 13000);
+```
+
+<ParamField path="ticks" type="long" required>
+  Time in ticks (0-24000)
+</ParamField>
+
+#### applyTimeToPlayer(player)
+
+Applies terrain-specific time to a player (called automatically).
+
+```java
+TerrainCustomizeManager.applyTimeToPlayer(player);
+```
+
+### Potion Effects
+
+#### setEffect(terrain, player, effectName)
+
+Sets an ambient potion effect for the terrain.
+
+```java
+TerrainCustomizeManager.setEffect(terrain, player, "SPEED");
+// Options: REGENERATION, SPEED, INCREASE_DAMAGE, WATER_BREATHING, 
+//          NIGHT_VISION, INVISIBILITY, SLOW, NONE
+```
+
+#### getEffect(terrain)
+
+Gets the current ambient effect.
+
+```java
+String effect = TerrainCustomizeManager.getEffect(terrain);
+```
+
+#### applyEffectToPlayer(player)
+
+Applies terrain effect to a player (called automatically).
+
+```java
+TerrainCustomizeManager.applyEffectToPlayer(player);
+```
+
+<Note>
+  Effects are automatically reapplied every few seconds while players are in the terrain.
+</Note>
+
+## Complete Example: Protection System
+
+```java
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.entity.Player;
+import org.debentialc.claims.managers.TerrainManager;
+import org.debentialc.claims.managers.TerrainCustomizeManager;
+import org.debentialc.claims.models.Terrain;
+
+public class TerrainProtectionListener implements Listener {
+    
+    private final TerrainManager manager = TerrainManager.getInstance();
+    
+    @EventHandler
+    public void onBlockBreak(BlockBreakEvent event) {
+        Player player = event.getPlayer();
+        Terrain terrain = manager.getTerrainAt(event.getBlock().getLocation());
+        
+        if (!manager.canBreak(terrain, player)) {
+            event.setCancelled(true);
+            player.sendMessage("§cYou cannot break blocks here!");
+        }
+    }
+    
+    @EventHandler
+    public void onInteract(PlayerInteractEvent event) {
+        if (event.getClickedBlock() == null) return;
+        
+        Player player = event.getPlayer();
+        Terrain terrain = manager.getTerrainAt(event.getClickedBlock().getLocation());
+        
+        if (!manager.canInteract(terrain, player)) {
+            event.setCancelled(true);
+            player.sendMessage("§cYou cannot interact here!");
+        }
+    }
+}
+```
+
+## Data Models
+
+### Terrain
+
+<ResponseField name="id" type="String">
+  Unique terrain identifier
+</ResponseField>
+
+<ResponseField name="chunks" type="int">
+  Size in chunks (1 chunk = 16x16 blocks)
+</ResponseField>
+
+<ResponseField name="price" type="double">
+  Purchase price
+</ResponseField>
+
+<ResponseField name="owner" type="UUID">
+  Owner's UUID (null if unowned)
+</ResponseField>
+
+<ResponseField name="ownerName" type="String">
+  Owner's name
+</ResponseField>
+
+<ResponseField name="origin" type="Location">
+  World position (null if uncommitted)
+</ResponseField>
+
+<ResponseField name="committed" type="boolean">
+  Whether terrain is placed in world
+</ResponseField>
+
+<ResponseField name="members" type="Map<UUID, List<MemberRole>>">
+  Member permissions
+</ResponseField>
+
+### MemberRole Enum
+
+- `BUILD` - Can place blocks
+- `BREAK` - Can break blocks  
+- `CONTAINERS` - Can open chests, furnaces
+- `ALL` - Full permissions
+
+## Best Practices
+
+<Tip>
+  **Always Check Terrain**: Use `getTerrainAt()` in protection listeners to check if a location is claimed.
+</Tip>
+
+<Note>
+  **Buffer Zones**: Terrains have a 16-block buffer to prevent them from touching. This prevents border disputes.
+</Note>
+
+<Warning>
+  **Lease Payments**: The lease system automatically processes payments every 5 minutes. Ensure economy plugin is properly configured.
+</Warning>
+
+<Tip>
+  **Sub-Terrain Margins**: Sub-terrains must be 2 blocks inside parent terrain borders to prevent conflicts.
+</Tip>

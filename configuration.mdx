@@ -1,0 +1,593 @@
+---
+title: Configuration
+description: Comprehensive configuration guide for all Debentialc modules including Boosters, Custom Items, Raids, and Territory Claims
+---
+
+# Configuration
+
+Debentialc uses JSON-based configuration with programmatic settings. This guide covers configuration for all four major modules.
+
+## Configuration File Structure
+
+All configuration data is stored in `plugins/Debentialc/data/`:
+
+```
+plugins/Debentialc/data/
+├── boosters/
+│   ├── global_boosters.json      # Active global boosters
+│   └── personal_boosters.json    # Player personal boosters
+├── raids/
+│   ├── raids.json                # Raid definitions
+│   ├── cooldowns.json            # Player cooldowns
+│   └── system_data.json          # System statistics
+├── claims/
+│   └── terrains.json             # Territory data
+└── customitems/
+    └── items.json                # Custom item definitions
+```
+
+<Note>
+  Most configuration is done through in-game commands or programmatically. Direct JSON editing is supported but use caution.
+</Note>
+
+## Booster Module Configuration
+
+The booster system is configured primarily through the `BoosterSettings` class and in-game commands.
+
+### Settings Overview
+
+Booster settings are managed programmatically (Main.java:185-198):
+
+```java
+import org.debentialc.boosters.core.BoosterSettings;
+
+public static void customizeExample() {
+    // Configure personal booster multipliers by level (1-5)
+    BoosterSettings.setPersonalBoosterMultiplier(1, 0.15);  // Level 1 = 15% bonus
+    BoosterSettings.setPersonalBoosterMultiplier(2, 0.30);  // Level 2 = 30% bonus
+    BoosterSettings.setPersonalBoosterMultiplier(3, 0.60);  // Level 3 = 60% bonus
+    BoosterSettings.setPersonalBoosterMultiplier(4, 1.20);  // Level 4 = 120% bonus
+    BoosterSettings.setPersonalBoosterMultiplier(5, 2.50);  // Level 5 = 250% bonus
+    
+    // Configure rank-based multipliers (requires permissions plugin)
+    BoosterSettings.setRankMultiplier("admin", 3.0);      // 300% for admins
+    BoosterSettings.setRankMultiplier("moderator", 2.0);  // 200% for moderators
+    BoosterSettings.setRankMultiplier("vip", 1.5);        // 150% for VIP
+    
+    // Set default durations (in seconds)
+    BoosterSettings.setGlobalBoosterDuration(7200);    // 2 hours
+    BoosterSettings.setPersonalBoosterDuration(1800);  // 30 minutes
+}
+```
+
+### Booster Levels
+
+<AccordionGroup>
+  <Accordion title="Personal Booster Levels">
+    Personal boosters come in 5 configurable levels. Default configuration:
+    
+    | Level | Multiplier | Bonus Percentage |
+    |-------|------------|------------------|
+    | 1     | 1.15       | +15%            |
+    | 2     | 1.30       | +30%            |
+    | 3     | 1.60       | +60%            |
+    | 4     | 2.20       | +120%           |
+    | 5     | 3.50       | +250%           |
+    
+    Configure via:
+    ```java
+    BoosterSettings.setPersonalBoosterMultiplier(level, multiplier);
+    ```
+  </Accordion>
+  
+  <Accordion title="Global Boosters">
+    Global boosters affect all players on the server simultaneously.
+    
+    **Default Duration**: 7200 seconds (2 hours)
+    
+    **Activation** (Main.java:200-210):
+    ```java
+    import org.debentialc.boosters.managers.GlobalBoosterManager;
+    
+    // Activate a 2.5x global booster
+    GlobalBoosterManager.activateBooster(2.5, "AdminName");
+    
+    // Broadcast to all players
+    Bukkit.broadcastMessage("§6§lBooster Activated: 2.5x for 1 hour");
+    
+    // Auto-deactivate after 1 hour
+    Bukkit.getScheduler().scheduleSyncDelayedTask(
+        plugin, 
+        () -> GlobalBoosterManager.deactivateBooster(),
+        3600 * 20  // 1 hour in ticks
+    );
+    ```
+  </Accordion>
+  
+  <Accordion title="Rank Multipliers">
+    Additional multipliers based on permission groups.
+    
+    **Example Configuration**:
+    ```java
+    BoosterSettings.setRankMultiplier("owner", 5.0);      // 500%
+    BoosterSettings.setRankMultiplier("admin", 3.0);      // 300%
+    BoosterSettings.setRankMultiplier("moderator", 2.0);  // 200%
+    BoosterSettings.setRankMultiplier("helper", 1.5);     // 150%
+    BoosterSettings.setRankMultiplier("vip+", 1.3);       // 130%
+    BoosterSettings.setRankMultiplier("vip", 1.2);        // 120%
+    ```
+    
+    <Note>
+      Requires a permissions plugin (LuckPerms, PermissionsEx, etc.)
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+### Storage Configuration
+
+Boosters auto-save to JSON files (BoosterModule.java:59-62, 75-77):
+
+```java
+// Load on startup
+private static void loadData() {
+    BoosterStorage.loadAllData();
+    plugin.getLogger().info("Datos de Boosters cargados");
+}
+
+// Save on shutdown
+public static void shutdown() {
+    BoosterStorage.saveAllData();
+    plugin.getLogger().info("Sistema de Boosters guardado");
+}
+```
+
+**Manual Save/Load Commands**:
+```bash
+/booster save    # Manually save all booster data
+/booster load    # Reload booster data from disk
+```
+
+### PlaceholderAPI Integration
+
+If PlaceholderAPI is installed, these placeholders are available:
+
+| Placeholder | Description | Example Output |
+|-------------|-------------|----------------|
+| `%debentialc_booster_global%` | Global multiplier | `2.50x` |
+| `%debentialc_booster_personal%` | Personal multiplier | `1.30x` |
+| `%debentialc_booster_combined%` | Combined multiplier | `3.25x` |
+| `%debentialc_booster_time%` | Time remaining | `1h 45m` |
+| `%debentialc_booster_active%` | Active status | `true`/`false` |
+
+See BoosterModule.java:42-54 for registration code.
+
+## Custom Items Configuration
+
+Custom items are created and managed through commands, stored in JSON.
+
+### Creating Custom Items
+
+<Steps>
+  <Step title="Hold Base Item">
+    Hold the Minecraft item you want to convert (e.g., diamond sword)
+  </Step>
+  
+  <Step title="Create Custom Item">
+    ```bash
+    /ci create <id>
+    ```
+    Example: `/ci create legendary_sword`
+  </Step>
+  
+  <Step title="Add Stats">
+    ```bash
+    /ci plus <id> <value> <stat>       # Additive bonus
+    /ci less <id> <value> <stat>       # Subtractive penalty
+    /ci percentage <id> <value> <stat> # Multiplicative bonus
+    ```
+  </Step>
+  
+  <Step title="Add Effects">
+    ```bash
+    /ci effect <type> <value>
+    ```
+    Types: `HEALTHREGEN`, `KIREGEN`, `STAMINAREGEN`
+  </Step>
+  
+  <Step title="Customize Appearance">
+    ```bash
+    /ci rename <new name>
+    /ci addline <lore text>
+    /ci setline <line#> <text>
+    ```
+  </Step>
+</Steps>
+
+### Stat Configuration
+
+Available stats and operations (CustomItemCommand.java:85-108):
+
+<CodeGroup>
+```java Additive (+)
+// Adds flat value to stat
+CustomItem item = new CustomItem()
+    .setOperation("+", "str")
+    .setBonusStat("str", 50.0);  // +50 strength
+```
+
+```java Subtractive (-)
+// Removes value from stat (penalty)
+CustomItem item = new CustomItem()
+    .setOperation("-", "dex")
+    .setBonusStat("dex", 10.0);  // -10 dexterity
+```
+
+```java Multiplicative (*)
+// Multiplies stat by percentage
+CustomItem item = new CustomItem()
+    .setOperation("*", "con")
+    .setBonusStat("con", 0.25);  // +25% constitution
+```
+</CodeGroup>
+
+**Supported Stats**:
+- `str` - Strength
+- `con` - Constitution
+- `dex` - Dexterity
+- `will` - Willpower
+- `mnd` - Mind
+
+### Effects Configuration
+
+Special regeneration effects (CustomItemCommand.java:145-152):
+
+```bash
+# Health regeneration (percentage per tick)
+/ci effect HEALTHREGEN 0.05    # 5% health regen
+
+# Ki/Energy regeneration
+/ci effect KIREGEN 0.03         # 3% ki regen
+
+# Stamina regeneration
+/ci effect STAMINAREGEN 0.08    # 8% stamina regen
+```
+
+### Fragment System
+
+Collectible armor fragments with bonus integration (Main.java:132-142):
+
+```java
+import org.debentialc.customitems.tools.fragments.FragmentBonusIntegration;
+
+public static void armorTask() {
+    BukkitRunnable runnable = new BukkitRunnable() {
+        @Override
+        public void run() {
+            for (Player onlinePlayer : Main.instance.getServer().getOnlinePlayers()) {
+                FragmentBonusIntegration.applyFragmentBonuses(onlinePlayer);
+            }
+        }
+    };
+    runnable.runTaskTimer(Main.instance, 1L, 1L);  // Every tick
+}
+```
+
+Fragments automatically apply bonuses when worn as armor.
+
+### DBC Integration
+
+For Dragon Block C servers, race/class multipliers are loaded from config files (DBCConfigManager.java:15-21):
+
+```java
+public static void loadAllConfigs() {
+    String[] races = {"human", "saiyan", "half-saiyan", 
+                      "namekian", "arcosian", "majin"};
+    
+    for (String race : races) {
+        loadRaceConfig(race);  // Loads from config/jingames/dbc/{race}/main.cfg
+    }
+}
+```
+
+**Multiplier Stats**:
+- `Body` - Health multiplier
+- `EnergyPool` - Ki multiplier
+- `Stamina` - Stamina multiplier
+
+Access via:
+```java
+double bodyMult = DBCConfigManager.getBodyMultiplier("saiyan", "Warrior");
+```
+
+## Raid System Configuration
+
+Raids are configured through JSON files and managed via commands.
+
+### Raid Data Structure
+
+Raids are stored in `plugins/Debentialc/data/raids/raids.json` (RaidStorageManager.java:83-96):
+
+```json
+[
+  {
+    "raidId": "dragon_temple",
+    "displayName": "§c§lDragon Temple Raid",
+    "minPlayers": 3,
+    "maxPlayers": 8,
+    "difficulty": "HARD",
+    "cooldown": 3600,
+    "rewards": [
+      {"type": "ITEM", "id": "legendary_sword", "chance": 0.15},
+      {"type": "CURRENCY", "amount": 5000, "chance": 0.80}
+    ],
+    "location": {
+      "world": "world",
+      "x": 100.5,
+      "y": 64.0,
+      "z": -200.3,
+      "yaw": 180.0,
+      "pitch": 0.0
+    },
+    "enabled": true
+  }
+]
+```
+
+### Location Serialization
+
+Locations are automatically converted to/from JSON (RaidStorageManager.java:41-76):
+
+```java
+private static class LocationAdapter 
+    implements JsonSerializer<Location>, JsonDeserializer<Location> {
+    
+    @Override
+    public JsonElement serialize(Location loc, Type type, 
+                                 JsonSerializationContext context) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("world", loc.getWorld().getName());
+        obj.addProperty("x", loc.getX());
+        obj.addProperty("y", loc.getY());
+        obj.addProperty("z", loc.getZ());
+        obj.addProperty("yaw", loc.getYaw());
+        obj.addProperty("pitch", loc.getPitch());
+        return obj;
+    }
+}
+```
+
+### Cooldown Configuration
+
+Cooldowns are tracked per-player in `cooldowns.json` (RaidStorageManager.java:174-185):
+
+```java
+public static void saveCooldowns() {
+    Path filePath = Paths.get(BASE_PATH, COOLDOWNS_FILE);
+    Map<String, Map<String, Long>> cooldownsData = new HashMap<>();
+    String json = GSON.toJson(cooldownsData);
+    Files.write(filePath, json.getBytes(StandardCharsets.UTF_8));
+}
+```
+
+### Backup System
+
+Automatic raid data backups (RaidStorageManager.java:258-283):
+
+```java
+public static void backupRaids() {
+    Path source = Paths.get(BASE_PATH);
+    Path backup = Paths.get(BASE_PATH, "backup_" + System.currentTimeMillis());
+    Files.createDirectories(backup);
+    // Copies all raid data to timestamped backup folder
+}
+```
+
+<Note>
+  Run `/raid backup` to manually create a backup before making major changes.
+</Note>
+
+## Territory Claims Configuration
+
+Territories are managed through commands with JSON storage.
+
+### Creating Territories
+
+<Steps>
+  <Step title="Create Terrain Definition">
+    ```bash
+    /terrain create <id> <chunks>
+    ```
+    Example: `/terrain create downtown 4`
+    
+    This creates a 4x4 chunk territory (64x64 blocks)
+  </Step>
+  
+  <Step title="Set Price">
+    ```bash
+    /terrain price <id> <amount>
+    ```
+    Example: `/terrain price downtown 50000`
+  </Step>
+  
+  <Step title="Commit to World">
+    Stand at desired location:
+    ```bash
+    /terrain commit <id>
+    ```
+    
+    This generates the territory borders at your position.
+  </Step>
+</Steps>
+
+See TerrainCommand.java:71-96 for creation logic.
+
+### Territory Permissions
+
+<AccordionGroup>
+  <Accordion title="Permission Nodes">
+    ```yaml
+    # Admin permissions
+    debentialc.terrain.create     # Create territories
+    debentialc.terrain.price      # Set prices
+    debentialc.terrain.commit     # Generate in world
+    debentialc.terrain.delete     # Delete territories
+    debentialc.terrain.dissolve   # Remove ownership
+    debentialc.admin.manage       # Override ownership checks
+    
+    # Player permissions
+    debentialc.terrain.info       # View terrain info
+    debentialc.terrain.member     # Add members
+    debentialc.terrain.kick       # Remove members
+    debentialc.terrain.transfer   # Transfer ownership
+    debentialc.terrain.sell       # Sell territory back
+    ```
+  </Accordion>
+  
+  <Accordion title="Member Roles">
+    Four permission levels for territory members (TerrainCommand.java:219-226):
+    
+    ```java
+    public enum MemberRole {
+        BUILD,       // Can place blocks only
+        BREAK,       // Can break blocks only
+        CONTAINERS,  // Can access chests/containers
+        ALL          // Full permissions
+    }
+    ```
+    
+    **Usage**:
+    ```bash
+    /terrain member downtown PlayerName build
+    /terrain member downtown TrustedPlayer all
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Protection Configuration
+
+Territories protect against (TerrainProtectionListener events):
+
+- Block breaking (non-members)
+- Block placement (non-members)
+- Container access (without CONTAINERS or ALL permission)
+- PvP (optional, configurable per territory)
+- Entity damage (optional)
+
+### Environmental Effects
+
+Custom effects applied to players in territories (Main.java:90-100):
+
+```java
+private void startTerrainEffectsTask() {
+    new BukkitRunnable() {
+        @Override
+        public void run() {
+            for (Player player : getServer().getOnlinePlayers()) {
+                TerrainCustomizeManager.applyEffectToPlayer(player);
+                TerrainCustomizeManager.applyTimeToPlayer(player);
+            }
+        }
+    }.runTaskTimer(this, 20L, 180L);  // Every 9 seconds
+}
+```
+
+**Configure per territory**:
+- Potion effects (speed, jump boost, etc.)
+- Custom time (day/night override)
+- Weather effects
+
+### Economy Integration
+
+Territories use Vault for purchases (TerrainCommand.java:329-341):
+
+```java
+// Selling a territory refunds 50% of purchase price
+double refund = terrain.getPrice() / 2;
+
+if (TerrainManager.getInstance().getEconomy() != null && refund > 0) {
+    TerrainManager.getInstance().getEconomy()
+        .depositPlayer(player.getName(), refund);
+    player.sendMessage("Territory sold. Refund: $" + (int) refund);
+}
+```
+
+<Warning>
+  Requires Vault + economy plugin (EssentialsX, CMI, etc.)
+</Warning>
+
+## Permissions Reference
+
+### Booster Permissions
+
+```yaml
+debentialc.command.booster              # Access booster commands
+debentialc.booster.global.activate      # Activate global boosters
+debentialc.booster.global.deactivate    # Deactivate global boosters
+debentialc.booster.personal.add         # Give personal boosters
+debentialc.booster.personal.activate    # Activate own boosters
+debentialc.booster.admin                # All booster permissions
+```
+
+### Custom Item Permissions
+
+```yaml
+debentialc.command.ci                   # Access /ci commands
+debentialc.ci.create                    # Create custom items
+debentialc.ci.delete                    # Delete custom items
+debentialc.ci.give                      # Give items to players
+debentialc.ci.edit                      # Modify item properties
+debentialc.ci.admin                     # All custom item permissions
+```
+
+### Raid Permissions
+
+```yaml
+debentialc.command.raid                 # Access raid commands
+debentialc.raid.create                  # Create raids
+debentialc.raid.start                   # Start raid sessions
+debentialc.raid.join                    # Join active raids
+debentialc.raid.admin                   # All raid permissions
+```
+
+### Territory Permissions
+
+See "Territory Permissions" accordion above.
+
+## Advanced Configuration
+
+### Custom Command Framework
+
+Commands use a custom annotation-based framework (BoosterCommand.java:23):
+
+```java
+@Command(name = "booster", 
+         aliases = {"booster", "boosters", "boost"}, 
+         permission = Permissions.COMMAND + "booster")
+@Override
+public void onCommand(CommandArgs command) throws IOException {
+    // Command logic
+}
+```
+
+### Module Initialization
+
+Modules initialize independently (Main.java:74-76):
+
+```java
+BoosterModule.initialize(this);
+PlaceholderModule.initialize(this);
+ClaimsModule.initialize(this);
+```
+
+To disable a module, comment out its initialization line and rebuild.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Learn command workflows and usage examples
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/commands/booster">
+    Integrate Debentialc into your plugins
+  </Card>
+</CardGroup>

@@ -1,0 +1,547 @@
+---
+title: Raid Commands
+description: Complete reference for managing raids and parties in the Debentialc raid system
+---
+
+# Raid Commands
+
+The raid system provides instanced group content where parties can face waves of enemies for rewards. Raids support cooldowns, party management, and visual menus.
+
+## Raid Management
+
+### /raid
+
+**Permission:** `dbcplugin.raids.admin`
+
+**Usage:** `/raid [subcommand]`
+
+**In-Game Only:** Yes
+
+Main command for raid administration. Without arguments, opens the visual raid configuration menu.
+
+---
+
+## Raid Subcommands
+
+### /raid create
+
+**Usage:** `/raid create`
+
+Starts the interactive chat-based raid creation wizard.
+
+**Example:**
+
+```bash
+/raid create
+```
+
+This initiates a guided setup process using chat input to create a new raid with:
+- Raid name and ID
+- Wave configurations
+- Spawn points
+- Rewards
+- Cooldown settings
+
+<Note>
+  The creation process uses `RaidChatInputManager` to guide you through each step.
+</Note>
+
+---
+
+### /raid list
+
+**Usage:** `/raid list`
+
+Opens a visual menu showing all configured raids.
+
+**Example:**
+
+```bash
+/raid list
+```
+
+**Output:**
+
+Opens `RaidListMenu` (SmartInventory) showing:
+- Raid names and IDs
+- Number of waves
+- Player requirements
+- Current status (active/inactive)
+- Edit options
+
+---
+
+### /raid menu
+
+**Usage:** `/raid menu`
+
+Opens the main raid configuration menu (same as `/raid` with no args).
+
+**Example:**
+
+```bash
+/raid menu
+```
+
+**Output:**
+
+Opens `RaidMainMenu` (SmartInventory) with options for:
+- Creating new raids
+- Managing existing raids
+- Viewing active sessions
+- System configuration
+
+---
+
+### /raid info
+
+**Usage:** `/raid info`
+
+Displays help information about the raid system.
+
+**Example:**
+
+```bash
+/raid info
+```
+
+**Output:**
+
+```
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+  SISTEMA DE RAIDS
+
+  /raid - Abrir menú visual
+  /raid create - Crear nueva raid
+  /raid list - Ver todas las raids
+  /raid menu - Menú principal
+  /raid info - Esta información
+  /raid reload - Recargar datos
+  /raid save - Guardar todo
+
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+```
+
+---
+
+### /raid reload
+
+**Usage:** `/raid reload`
+
+Reloads all raid data and cooldowns from storage.
+
+**Example:**
+
+```bash
+/raid reload
+```
+
+**Output:**
+
+```
+✓ Sistema de raids recargado
+Raids cargadas y cooldowns restaurados
+```
+
+<Warning>
+  This will reload all raid configurations and active cooldowns. Active raid sessions are not affected.
+</Warning>
+
+---
+
+### /raid save
+
+**Usage:** `/raid save`
+
+Manually saves all raid data and cooldowns to disk.
+
+**Example:**
+
+```bash
+/raid save
+```
+
+**Output:**
+
+```
+✓ Raids y cooldowns guardados
+```
+
+<Note>
+  Raid data is automatically saved periodically. This command is for manual backups.
+</Note>
+
+---
+
+## Party Commands
+
+### /party
+
+**Permission:** None (available to all players)
+
+**Usage:** `/party [subcommand]`
+
+**In-Game Only:** Yes
+
+Main command for party management. Without arguments, displays the party help menu.
+
+---
+
+## Party Subcommands
+
+### /party create
+
+**Usage:** `/party create`
+
+Creates a new party with you as the leader.
+
+**Example:**
+
+```bash
+/party create
+```
+
+**Output:**
+
+```
+✓ Party creada. Invita jugadores con: /party invite <jugador>
+```
+
+<Note>
+  Default max party size is 5 players. You cannot create a party if you're already in one.
+</Note>
+
+---
+
+### /party invite
+
+**Usage:** `/party invite <player>`
+
+**Leader Only:** Yes
+
+Invites a player to your party.
+
+<ParamField path="player" type="string" required>
+  Username of the player to invite (must be online)
+</ParamField>
+
+**Example:**
+
+```bash
+/party invite Steve
+```
+
+**Output (sender):**
+
+```
+✓ Invitación enviada a Steve
+```
+
+**Output (recipient):**
+
+```
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+  INVITACIÓN DE PARTY
+
+  PlayerName te invitó a su party
+
+  /party accept - Aceptar
+  /party deny - Rechazar
+
+  La invitación expira en 60 segundos
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+```
+
+<Warning>
+  - Party must not be full
+  - Target player cannot already be in a party
+  - Only one pending invitation per player at a time
+  - Invitations expire after 60 seconds
+</Warning>
+
+---
+
+### /party accept
+
+**Usage:** `/party accept`
+
+Accepts a pending party invitation.
+
+**Example:**
+
+```bash
+/party accept
+```
+
+**Output:**
+
+```
+✓ Te has unido a la party
+```
+
+<Note>
+  All party members are notified when a new member joins.
+</Note>
+
+---
+
+### /party deny
+
+**Aliases:** `decline`, `reject`
+
+**Usage:** `/party deny`
+
+Declines a pending party invitation.
+
+**Example:**
+
+```bash
+/party deny
+```
+
+**Output:**
+
+```
+✓ Invitación rechazada
+```
+
+---
+
+### /party leave
+
+**Usage:** `/party leave`
+
+Leaves your current party.
+
+**Example:**
+
+```bash
+/party leave
+```
+
+**Output:**
+
+```
+✓ Has abandonado la party
+```
+
+<Note>
+  If the leader leaves, the party is automatically disbanded.
+</Note>
+
+---
+
+### /party start
+
+**Usage:** `/party start <raid>`
+
+**Leader Only:** Yes
+
+Starts a raid with your party.
+
+<ParamField path="raid" type="string" required>
+  Name or ID of the raid to start
+</ParamField>
+
+**Requirements:**
+- Must be party leader
+- At least 2 players in party
+- No party members on cooldown for this raid
+- Raid must be properly configured
+- No other party currently running this raid
+
+**Example:**
+
+```bash
+/party start dragon_temple
+```
+
+**Output:**
+
+```
+✓ Raid iniciada: Dragon Temple
+```
+
+All party members are then:
+1. Teleported to the raid spawn point
+2. Shown raid start effects
+3. Notified with title and sound
+4. Wave 1 begins after 2 seconds
+
+**Cooldown Validation:**
+
+If any party member has an active cooldown:
+
+```
+✗ PlayerName tiene cooldown activo
+Tiempo restante: 1h 23m 45s
+```
+
+<Warning>
+  Starting a raid puts ALL party members on cooldown, even if they die or leave early.
+</Warning>
+
+---
+
+### /party info
+
+**Usage:** `/party info`
+
+Displays information about your current party.
+
+**Example:**
+
+```bash
+/party info
+```
+
+**Output:**
+
+```
+=== Party Info ===
+Líder: PlayerName
+Miembros: 3/5
+Estado: WAITING
+```
+
+---
+
+### /party members
+
+**Usage:** `/party members`
+
+Lists all members in your party.
+
+**Example:**
+
+```bash
+/party members
+```
+
+**Output:**
+
+```
+=== Miembros de la Party ===
+  [Líder] PlayerName
+  [Miembro] Steve
+  [Miembro] Alex
+```
+
+---
+
+### /party disband
+
+**Usage:** `/party disband`
+
+**Leader Only:** Yes
+
+Disbands your party, removing all members.
+
+**Example:**
+
+```bash
+/party disband
+```
+
+**Output (leader):**
+
+```
+✓ Party disuelta
+```
+
+**Output (members):**
+
+```
+✗ La party ha sido disuelta por el líder
+```
+
+<Warning>
+  This cannot be undone. All members will be removed from the party.
+</Warning>
+
+---
+
+## Party Help
+
+### /party help
+
+**Usage:** `/party` or `/party help`
+
+Displays the party command help menu.
+
+**Output:**
+
+```
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+  COMANDOS DE PARTY
+
+  /party create - Crear nueva party
+  /party invite <jugador> - Invitar jugador
+  /party accept - Aceptar invitación
+  /party deny - Rechazar invitación
+  /party leave - Abandonar party
+  /party start <raid> - Iniciar raid (solo líder)
+  /party info - Ver información de party
+  /party members - Ver miembros
+  /party disband - Disolver party (solo líder)
+
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+```
+
+---
+
+## Implementation Details
+
+### Source Files
+
+- **RaidCommand.java** - Line 20: Main raid command handler
+- **PartyCommand.java** - Line 40: Party system commands
+- **RaidSessionManager.java** - Active raid session management
+- **PartyManager.java** - Party lifecycle management
+- **CooldownManager.java** - Raid cooldown tracking
+
+### Party States
+
+Parties have the following states:
+
+- **WAITING** - Party is idle, can invite members
+- **IN_RAID** - Party is actively in a raid
+- **DISBANDED** - Party no longer exists
+
+### Raid Session Flow
+
+1. Party leader uses `/party start <raid>`
+2. System validates requirements (size, cooldowns, raid config)
+3. Creates `RaidSession` and links to party
+4. Teleports all members to spawn point
+5. Party status changes to `IN_RAID`
+6. Wave 1 spawns after 2 second delay
+7. Players defeat waves sequentially
+8. On completion or failure:
+   - Cooldowns applied to all participants
+   - Party status returns to `WAITING`
+   - Session cleaned up
+
+### Cooldown System
+
+Cooldowns are per-player per-raid:
+
+```java
+// Check if player has cooldown
+boolean hasCooldown = CooldownManager.hasCooldown(playerId, raidId);
+
+// Get remaining time in seconds
+long remaining = CooldownManager.getCooldownRemaining(playerId, raidId);
+
+// Get formatted time string
+String formatted = CooldownManager.getCooldownFormattedTime(playerId, raidId);
+// Example: "1h 23m 45s"
+```
+
+### Invitation System
+
+Invitations:
+- Stored in `PendingInvite` map
+- Expire after 60 seconds (1200 ticks)
+- Automatically cleaned up on expiry
+- Removed on accept/deny

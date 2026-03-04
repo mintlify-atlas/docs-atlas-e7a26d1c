@@ -1,0 +1,571 @@
+---
+title: 'Storage Systems'
+description: 'Understanding how Debentialc stores and manages plugin data'
+---
+
+## Overview
+
+Debentialc uses multiple storage systems to persist data across server restarts. Each module has its own storage mechanism optimized for its specific needs.
+
+<Note>
+  All data is stored in the `plugins/Debentialc/data/` directory.
+</Note>
+
+## Storage Locations
+
+```
+plugins/Debentialc/
+├── data/
+│   ├── boosters/           # Booster system data
+│   │   ├── global.json
+│   │   └── personal/
+│   │       └── <uuid>/
+│   │           └── boosters.json
+│   ├── raids/              # Raids system data
+│   │   ├── raids.json
+│   │   ├── cooldowns.json
+│   │   ├── system_data.json
+│   │   └── raid_<id>/
+│   │       └── config.json
+│   └── claims/             # Claims/terrain data
+│       └── terrains/
+│           └── <terrain-id>.dat
+```
+
+## Booster Storage
+
+### Architecture
+
+The booster system uses **JSON-based storage** with separate files for global and personal boosters.
+
+**Source**: `BoosterStorage.java`
+
+### Global Booster Storage
+
+<AccordionGroup>
+  <Accordion title="Storage Format">
+    **File**: `plugins/Debentialc/data/boosters/global.json`
+    
+    **Format**: JSON with GSON pretty printing
+    
+    ```json
+    {
+      "multiplier": 2.5,
+      "activatedBy": "AdminName",
+      "activationTime": 1709500000000,
+      "duration": 7200,
+      "active": true
+    }
+    ```
+    
+    **Source**: `BoosterStorage.java:36-44`
+  </Accordion>
+
+  <Accordion title="Save/Load Operations">
+    **Save Method**:
+    ```java
+    BoosterStorage.saveGlobalBooster(GlobalBooster booster)
+    ```
+    
+    **Load Method**:
+    ```java
+    GlobalBooster booster = BoosterStorage.loadGlobalBooster()
+    ```
+    
+    **Auto-save triggers**:
+    - Server shutdown (via `BoosterModule.shutdown()`)
+    - Manual save command: `/booster save`
+    - Booster activation
+    - Booster deactivation
+    
+    **Source**: `BoosterStorage.java:46-57`, `BoosterStorage.java:104-109`
+  </Accordion>
+
+  <Accordion title="Expiration Handling">
+    On server startup, the system checks if the global booster has expired:
+    
+    ```java
+    if (global != null && !global.hasExpired()) {
+        GlobalBoosterManager.restoreBooster(global);
+    }
+    ```
+    
+    **Expired boosters are not restored** - they're discarded on load.
+    
+    **Source**: `BoosterStorage.java:89-102`
+  </Accordion>
+</AccordionGroup>
+
+### Personal Booster Storage
+
+<AccordionGroup>
+  <Accordion title="Storage Structure">
+    **Directory**: `plugins/Debentialc/data/boosters/personal/<player-uuid>/`
+    
+    **File**: `boosters.json`
+    
+    **Format**: JSON array of booster objects
+    
+    ```json
+    [
+      {
+        "playerId": "069a79f4-44e9-4726-a5be-fca90e38aaf9",
+        "level": 3,
+        "multiplier": 1.6,
+        "active": true,
+        "activationTime": 1709500000000
+      },
+      {
+        "playerId": "069a79f4-44e9-4726-a5be-fca90e38aaf9",
+        "level": 5,
+        "multiplier": 3.5,
+        "active": false,
+        "activationTime": null
+      }
+    ]
+    ```
+    
+    **Source**: `BoosterStorage.java:60-71`
+  </Accordion>
+
+  <Accordion title="Player Data Management">
+    **Save player boosters**:
+    ```java
+    BoosterStorage.savePersonalBoosters(UUID playerId, List<PersonalBooster> boosters)
+    ```
+    
+    **Load player boosters**:
+    ```java
+    List<PersonalBooster> boosters = BoosterStorage.loadPersonalBoosters(UUID playerId)
+    ```
+    
+    **Delete player data**:
+    ```java
+    BoosterStorage.deletePersonalBoosters(UUID playerId)
+    ```
+    
+    **Storage triggers**:
+    - Player joins server
+    - Player quits server
+    - Booster activated/deactivated
+    - Manual save command
+    
+    **Source**: `BoosterStorage.java:73-128`
+  </Accordion>
+</AccordionGroup>
+
+## Raids Storage
+
+### Architecture
+
+Raids use **JSON storage with GSON** and include special handling for Bukkit Location objects.
+
+**Source**: `RaidStorageManager.java`
+
+### Raid Data Files
+
+<AccordionGroup>
+  <Accordion title="Main Raids File">
+    **File**: `plugins/Debentialc/data/raids/raids.json`
+    
+    **Content**: Array of all configured raids
+    
+    **Format**:
+    ```json
+    [
+      {
+        "raidId": "dragon_temple",
+        "raidName": "Dragon Temple Raid",
+        "enabled": true,
+        "playerSpawnPoint": {
+          "world": "world",
+          "x": 100.5,
+          "y": 64.0,
+          "z": 200.5,
+          "yaw": 90.0,
+          "pitch": 0.0
+        },
+        "waves": [...]
+      }
+    ]
+    ```
+    
+    **Source**: `RaidStorageManager.java:83-96`
+  </Accordion>
+
+  <Accordion title="Individual Raid Files">
+    **Directory**: `plugins/Debentialc/data/raids/raid_<id>/`
+    
+    **File**: `config.json`
+    
+    **Purpose**: Backup/individual raid configurations
+    
+    **Save individual raid**:
+    ```java
+    RaidStorageManager.saveRaid(Raid raid)
+    ```
+    
+    **Load individual raid**:
+    ```java
+    Raid raid = RaidStorageManager.loadRaid(String raidId)
+    ```
+    
+    **Source**: `RaidStorageManager.java:131-170`
+  </Accordion>
+
+  <Accordion title="Cooldown Storage">
+    **File**: `plugins/Debentialc/data/raids/cooldowns.json`
+    
+    **Format**: Map of player UUIDs to raid cooldown timestamps
+    
+    ```json
+    {
+      "069a79f4-44e9-4726-a5be-fca90e38aaf9": {
+        "dragon_temple": 1709503600000,
+        "nether_fortress": 1709507200000
+      }
+    }
+    ```
+    
+    **Operations**:
+    ```java
+    RaidStorageManager.saveCooldowns()
+    RaidStorageManager.loadCooldowns()
+    ```
+    
+    **Source**: `RaidStorageManager.java:174-200`
+  </Accordion>
+
+  <Accordion title="System Data">
+    **File**: `plugins/Debentialc/data/raids/system_data.json`
+    
+    **Content**: Statistical and system information
+    
+    ```json
+    {
+      "totalRaids": 5,
+      "totalEnabledRaids": 3,
+      "totalParties": 2,
+      "totalPlayersInParties": 8,
+      "totalActiveSessions": 1,
+      "totalPlayersInRaids": 4,
+      "lastSaveTime": 1709500000000
+    }
+    ```
+    
+    **Source**: `RaidStorageManager.java:223-242`
+  </Accordion>
+</AccordionGroup>
+
+### Location Serialization
+
+<Tip>
+  Bukkit Location objects are automatically serialized using a custom GSON adapter.
+</Tip>
+
+**Adapter implementation**:
+
+```java
+private static class LocationAdapter implements JsonSerializer<Location>, JsonDeserializer<Location> {
+    @Override
+    public JsonElement serialize(Location loc, Type type, JsonSerializationContext context) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("world", loc.getWorld().getName());
+        obj.addProperty("x", loc.getX());
+        obj.addProperty("y", loc.getY());
+        obj.addProperty("z", loc.getZ());
+        obj.addProperty("yaw", loc.getYaw());
+        obj.addProperty("pitch", loc.getPitch());
+        return obj;
+    }
+    // ... deserialize method
+}
+```
+
+**Source**: `RaidStorageManager.java:41-76`
+
+## Claims/Terrain Storage
+
+### Architecture
+
+Claims use **Properties-based storage** with `.dat` files for compatibility and simplicity.
+
+**Source**: `TerrainStorage.java`
+
+### Terrain Data Format
+
+<AccordionGroup>
+  <Accordion title="Storage Format">
+    **File**: `plugins/Debentialc/data/claims/terrains/<terrain-id>.dat`
+    
+    **Format**: Java Properties file
+    
+    ```properties
+    id=spawn_territory
+    chunks=4
+    price=50000.0
+    committed=true
+    owner=069a79f4-44e9-4726-a5be-fca90e38aaf9
+    ownerName=PlayerName
+    world=world
+    x=100
+    y=64
+    z=200
+    members=uuid1:BUILD,BREAK;uuid2:ALL
+    ```
+    
+    **Source**: `TerrainStorage.java:29-72`
+  </Accordion>
+
+  <Accordion title="Member Serialization">
+    Members are stored as a semicolon-separated list:
+    
+    **Format**: `<uuid>:<role1>,<role2>;<uuid>:<role1>,<role2>`
+    
+    **Example**:
+    ```properties
+    members=069a79f4-44e9-4726-a5be-fca90e38aaf9:BUILD,BREAK;550e8400-e29b-41d4-a716-446655440000:ALL
+    ```
+    
+    **Available roles**: `BUILD`, `BREAK`, `CONTAINERS`, `ALL`
+    
+    **Source**: `TerrainStorage.java:51-64`, `TerrainStorage.java:110-124`
+  </Accordion>
+
+  <Accordion title="Load/Save Operations">
+    **Save terrain**:
+    ```java
+    TerrainStorage storage = new TerrainStorage();
+    storage.saveTerrain(Terrain terrain);
+    ```
+    
+    **Load all terrains**:
+    ```java
+    Map<String, Terrain> terrains = storage.loadAll();
+    ```
+    
+    **Delete terrain**:
+    ```java
+    storage.deleteTerrain(String id);
+    ```
+    
+    **Source**: `TerrainStorage.java:29-137`
+  </Accordion>
+</AccordionGroup>
+
+## Data Management Commands
+
+### Manual Save/Load
+
+```bash
+# Save all booster data
+/booster save
+
+# Load booster data
+/booster load
+
+# Save raid data
+/raid save
+
+# Reload raid data
+/raid reload
+```
+
+### Automatic Saves
+
+<AccordionGroup>
+  <Accordion title="Booster Auto-Save">
+    **Triggers**:
+    - Server shutdown
+    - Booster activation
+    - Booster deactivation
+    - Player disconnect (personal boosters)
+    
+    **Implementation**:
+    ```java
+    @Override
+    public void onDisable() {
+        BoosterModule.shutdown();  // Saves all data
+    }
+    ```
+    
+    **Source**: `Main.java:151-154`
+  </Accordion>
+
+  <Accordion title="Raid Auto-Save">
+    **Triggers**:
+    - Server shutdown
+    - Raid creation/deletion
+    - Raid configuration changes
+    - Cooldown updates
+    
+    **No auto-save interval** - only on explicit events
+  </Accordion>
+
+  <Accordion title="Terrain Auto-Save">
+    **Triggers**:
+    - Terrain creation
+    - Ownership change
+    - Member addition/removal
+    - Price update
+    - Customization changes
+    
+    **Immediate persistence** after each operation
+  </Accordion>
+</AccordionGroup>
+
+## Backup and Cleanup
+
+### Raid Backup System
+
+```java
+// Create backup of all raid data
+RaidStorageManager.backupRaids();
+```
+
+**Backup location**: `plugins/Debentialc/data/raids/backup_<timestamp>/`
+
+**Source**: `RaidStorageManager.java:258-283`
+
+### Cleanup Operations
+
+```java
+// Remove orphaned raid directories
+RaidStorageManager.cleanup();
+
+// Delete specific raid files
+RaidStorageManager.deleteRaidFiles(String raidId);
+```
+
+**Source**: `RaidStorageManager.java:285-314`, `RaidStorageManager.java:202-221`
+
+## Migration and Compatibility
+
+### Version Compatibility
+
+<Warning>
+  Storage formats may change between major versions. Always backup your data before updating.
+</Warning>
+
+### Manual Data Migration
+
+If you need to migrate data:
+
+1. **Stop the server**
+2. **Backup** `plugins/Debentialc/data/`
+3. **Update plugin**
+4. **Start server** - automatic migration will run if available
+5. **Verify data** with list/info commands
+
+## Performance Considerations
+
+### File I/O Optimization
+
+<Tip>
+  All file operations use `StandardCharsets.UTF_8` encoding for consistency and proper character support.
+</Tip>
+
+**Async operations**: Storage operations run **synchronously** on main thread to prevent race conditions.
+
+### Storage Best Practices
+
+1. **Regular backups**: Use `/raid save` and backup the data folder weekly
+2. **Monitor file sizes**: Large player counts = many personal booster files
+3. **Cleanup inactive data**: Remove old player booster files periodically
+4. **Test restores**: Periodically test loading from backup
+
+## Troubleshooting Storage Issues
+
+<AccordionGroup>
+  <Accordion title="Data not persisting">
+    **Problem**: Changes lost after restart
+    
+    **Solutions**:
+    1. Check file permissions on `plugins/Debentialc/data/`
+    2. Verify disk space is available
+    3. Check console for IOException errors
+    4. Ensure plugin shutdown completes (no force-kill)
+    
+    **Manual save**:
+    ```bash
+    /booster save
+    /raid save
+    ```
+  </Accordion>
+
+  <Accordion title="Corrupted data files">
+    **Problem**: JSON parsing errors on startup
+    
+    **Error example**:
+    ```
+    [Raids] Error al cargar raids: com.google.gson.JsonSyntaxException
+    ```
+    
+    **Solutions**:
+    1. Check JSON syntax at jsonlint.com
+    2. Restore from backup
+    3. Delete corrupted file (data will be recreated)
+    4. Use backup from `raids/backup_<timestamp>/`
+  </Accordion>
+
+  <Accordion title="Missing player data">
+    **Problem**: Player's boosters disappeared
+    
+    **Check**:
+    ```bash
+    # Verify file exists
+    ls plugins/Debentialc/data/boosters/personal/<uuid>/
+    
+    # Check file contents
+    cat plugins/Debentialc/data/boosters/personal/<uuid>/boosters.json
+    ```
+    
+    **Possible causes**:
+    - Player never received boosters
+    - Boosters expired and were removed
+    - Data directory permissions issue
+  </Accordion>
+
+  <Accordion title="World not found errors">
+    **Problem**: Raids fail to load with "Mundo no encontrado" error
+    
+    **Cause**: Raid spawn points reference world that doesn't exist
+    
+    **Solution**:
+    1. Edit `raids/raids.json`
+    2. Update world name to correct world
+    3. Or delete raid and recreate
+    
+    **Source**: `RaidStorageManager.java:68-71`
+  </Accordion>
+</AccordionGroup>
+
+## Developer API
+
+### Accessing Storage Programmatically
+
+```java
+// Save booster data
+import org.debentialc.boosters.storage.BoosterStorage;
+
+BoosterStorage.saveAllData();
+BoosterStorage.loadAllData();
+
+// Save raid data
+import org.debentialc.raids.managers.RaidStorageManager;
+
+RaidStorageManager.saveAllRaids();
+RaidStorageManager.loadAllRaids();
+
+// Save terrain
+import org.debentialc.claims.storage.TerrainStorage;
+
+TerrainStorage storage = new TerrainStorage();
+storage.saveTerrain(terrain);
+```
+
+## See Also
+
+- [Configuration](/configuration) - Configure storage paths
+- [Troubleshooting](/advanced/troubleshooting) - Solve common issues
+- [Permissions](/advanced/permissions) - Permission requirements

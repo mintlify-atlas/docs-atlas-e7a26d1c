@@ -1,0 +1,855 @@
+---
+title: "Claims/Territory System"
+description: "Complete technical documentation for the Claims system - territory creation, member permissions, environmental customization, leasing, and Vault economy integration"
+---
+
+## Overview
+
+The Claims System (also called Territory System) provides comprehensive land protection and management with **chunk-based territories**, **member permission roles**, **environmental customization**, and an advanced **leasing system** for sub-territory rentals. It integrates with Vault for economy transactions and supports complex ownership hierarchies.
+
+<CardGroup cols={2}>
+  <Card title="Territory Protection" icon="shield">
+    Chunk-based land claims with owner/member permission system
+  </Card>
+  <Card title="Leasing System" icon="file-contract">
+    Sub-territory rentals with automated payments and grace periods
+  </Card>
+  <Card title="Environmental Control" icon="cloud-sun">
+    Customize biome, time, weather, rules, and effects per territory
+  </Card>
+  <Card title="Vault Integration" icon="coins">
+    Economy-driven purchases, sales, and rental payments
+  </Card>
+</CardGroup>
+
+## Architecture
+
+### Package Structure
+
+```
+org.debentialc.claims/
+├── commands/                  # CLI interface
+│   ├── TerrainCommand.java
+│   ├── LeaseCommand.java
+│   └── TerritoryMenuCommand.java
+├── managers/                  # Core business logic
+│   ├── TerrainManager.java
+│   ├── LeaseManager.java
+│   ├── TerrainCustomizeManager.java
+│   └── ClaimsPermissions.java
+├── models/                    # Data structures
+│   ├── Terrain.java
+│   ├── LeaseContract.java
+│   └── LeaseSelectionSession.java
+├── storage/                   # Persistence layer
+│   ├── TerrainStorage.java
+│   ├── LeaseStorage.java
+│   └── TerrainCustomizeStorage.java
+├── events/                    # Event handlers
+│   ├── TerrainProtectionListener.java
+│   ├── LeaseProtectionListener.java
+│   ├── PlayerDeathInTerrain.java
+│   └── TerrainSignListener.java
+└── menus/                     # GUI management
+    ├── TerritoryMenu.java
+    ├── TerritoryListMenu.java
+    ├── TerrainCustomizeMenu.java
+    └── LeaseMenu.java
+```
+
+### System Flow
+
+<Steps>
+  <Step title="Territory Creation">
+    Admin creates territory with `/terrain create <id> <chunks>`
+  </Step>
+  <Step title="Commit Territory">
+    Admin commits at location, creating borders and sign
+  </Step>
+  <Step title="Purchase">
+    Player purchases territory with Vault economy integration
+  </Step>
+  <Step title="Member Management">
+    Owner adds members with specific permission roles
+  </Step>
+  <Step title="Customization">
+    Owner customizes biome, time, weather, rules, and effects
+  </Step>
+  <Step title="Leasing (Optional)">
+    Owner creates sub-territories and leases them to tenants
+  </Step>
+</Steps>
+
+## Core Models
+
+### Terrain Model
+
+**Location:** `claims/models/Terrain.java:11`
+
+```java
+public class Terrain {
+    
+    public enum MemberRole {
+        BUILD,      // Can place blocks
+        BREAK,      // Can break blocks
+        CONTAINERS, // Can open chests/furnaces
+        ALL         // All permissions
+    }
+    
+    private String id;                              // Unique identifier
+    private int chunks;                             // Size in chunks
+    private double price;                           // Purchase/sale price
+    private UUID owner;                             // Owner UUID
+    private String ownerName;                       // Owner name (cached)
+    private Location origin;                        // Corner location
+    private boolean committed;                      // Generated in world
+    private Map<UUID, List<MemberRole>> members;    // Member permissions
+    
+    public int getSizeInBlocks() {
+        return chunks * 16;
+    }
+    
+    public boolean isInsideTerrain(Location loc) {
+        if (origin == null) return false;
+        if (!loc.getWorld().getName().equals(origin.getWorld().getName())) return false;
+        
+        int ox = origin.getBlockX();
+        int oz = origin.getBlockZ();
+        int size = getSizeInBlocks();
+        int x = loc.getBlockX();
+        int z = loc.getBlockZ();
+        
+        return x >= ox && x < ox + size && z >= oz && z < oz + size;
+    }
+    
+    public boolean hasMemberRole(UUID uuid, MemberRole role) {
+        if (!members.containsKey(uuid)) return false;
+        List<MemberRole> roles = members.get(uuid);
+        return roles.contains(MemberRole.ALL) || roles.contains(role);
+    }
+}
+```
+
+### LeaseContract Model
+
+**Location:** `claims/models/LeaseContract.java`
+
+```java
+public class LeaseContract {
+    
+    public enum ContractStatus {
+        PENDING_TENANT,        // Waiting for tenant to accept
+        PENDING_OWNER,         // Waiting for owner to accept
+        AWAITING_SUBTERRAIN,   // Accepted, awaiting sub-territory assignment
+        ACTIVE,                // Active lease with payments
+        GRACE_PERIOD,          // Payment missed, grace period active
+        CANCELLED,             // Cancelled by either party
+        EXPIRED                // Evicted due to non-payment
+    }
+    
+    public enum ContractOrigin {
+        OWNER_OFFER,           // Owner offered lease to tenant
+        TENANT_REQUEST         // Tenant requested lease from owner
+    }
+    
+    private String contractId;                // Unique contract ID
+    private String parentTerrainId;           // Parent territory
+    private String subTerrainId;              // Created sub-territory
+    private UUID ownerId;                     // Parent territory owner
+    private String ownerName;
+    private UUID tenantId;                    // Tenant player
+    private String tenantName;
+    private int chunks;                       // Sub-territory size
+    private double pricePerCycle;             // Payment amount
+    private int cycleDays;                    // Payment frequency (days)
+    private ContractStatus status;
+    private ContractOrigin origin;
+    private long nextPaymentDue;              // Unix timestamp
+    private long graceEndTime;                // Unix timestamp
+    private long createdAt;
+    
+    // Pending move request data
+    private boolean hasPendingMove;
+    private String pendingMoveWorld;
+    private int pendingMoveX1, pendingMoveZ1;
+    private int pendingMoveX2, pendingMoveZ2;
+}
+```
+
+## Territory Management
+
+### TerrainManager
+
+**Location:** `claims/managers/TerrainManager.java:24`
+
+Core manager for territory operations:
+
+```java
+public class TerrainManager {
+    
+    private static final int BUFFER_BLOCKS = 16;  // Minimum spacing between territories
+    
+    private final Map<String, Terrain> terrains = new HashMap<>();
+    private final TerrainStorage storage;
+    private Economy economy;  // Vault economy provider
+    
+    /**
+     * Create a new territory (uncommitted)
+     */
+    public boolean createTerrain(String id, int chunks) {
+        if (terrains.containsKey(id)) return false;
+        
+        Terrain terrain = new Terrain(id, chunks);
+        terrains.put(id, terrain);
+        storage.saveTerrain(terrain);
+        
+        return true;
+    }
+    
+    /**
+     * Commit territory at player location
+     */
+    public boolean commitTerrain(String id, Player player) {
+        Terrain terrain = terrains.get(id);
+        if (terrain == null || terrain.isCommitted()) return false;
+        
+        Location center = player.getLocation();
+        int chunkX = center.getChunk().getX() * 16;
+        int chunkZ = center.getChunk().getZ() * 16;
+        int y = center.getBlockY();
+        World world = center.getWorld();
+        
+        // Check for collisions with other territories
+        String collision = checkCollision(id, world, chunkX, chunkZ, 
+                                         terrain.getSizeInBlocks());
+        if (collision != null) return false;
+        
+        // Set origin and commit
+        Location origin = new Location(world, chunkX, y, chunkZ);
+        terrain.setOrigin(origin);
+        terrain.setCommitted(true);
+        
+        // Build visual borders and sign
+        buildBorders(terrain, world, chunkX, chunkZ, y);
+        placeSign(terrain, world, chunkX, chunkZ, y);
+        
+        storage.saveTerrain(terrain);
+        return true;
+    }
+    
+    /**
+     * Check for collision with existing territories
+     */
+    public String checkCollision(String excludeId, World world, 
+                                 int ox, int oz, int size) {
+        int ax1 = ox - BUFFER_BLOCKS;
+        int az1 = oz - BUFFER_BLOCKS;
+        int ax2 = ox + size + BUFFER_BLOCKS;
+        int az2 = oz + size + BUFFER_BLOCKS;
+        
+        for (Terrain other : terrains.values()) {
+            if (!other.isCommitted()) continue;
+            if (excludeId != null && other.getId().equals(excludeId)) continue;
+            if (other.getOrigin() == null) continue;
+            if (!other.getOrigin().getWorld().getName().equals(world.getName())) 
+                continue;
+            
+            int bx1 = other.getOrigin().getBlockX();
+            int bz1 = other.getOrigin().getBlockZ();
+            int bx2 = bx1 + other.getSizeInBlocks();
+            int bz2 = bz1 + other.getSizeInBlocks();
+            
+            boolean overlapX = ax1 < bx2 && ax2 > bx1;
+            boolean overlapZ = az1 < bz2 && az2 > bz1;
+            
+            if (overlapX && overlapZ) return other.getId();
+        }
+        return null;
+    }
+}
+```
+
+### Border Construction
+
+**Location:** `claims/managers/TerrainManager.java:157`
+
+```java
+private void buildBorders(Terrain terrain, World world, int ox, int oz, int y) {
+    int size = terrain.getSizeInBlocks();
+    int slabId = 44;   // Stone slab
+    byte slabData = 0;
+    
+    // North and South edges
+    for (int x = ox; x < ox + size; x++) {
+        setBlock(world, x, y, oz, slabId, slabData);
+        setBlock(world, x, y, oz + size, slabId, slabData);
+    }
+    
+    // West and East edges
+    for (int z = oz; z < oz + size + 1; z++) {
+        setBlock(world, ox, y, z, slabId, slabData);
+        setBlock(world, ox + size, y, z, slabId, slabData);
+    }
+}
+```
+
+### Sign System
+
+**Location:** `claims/managers/TerrainManager.java:215`
+
+```java
+private void updateSign(Sign sign, Terrain terrain) {
+    sign.setLine(0, CC.translate("&8[ Terreno ]"));
+    sign.setLine(1, CC.translate("&7" + terrain.getId()));
+    
+    if (terrain.hasOwner()) {
+        sign.setLine(2, CC.translate("&f" + terrain.getOwnerName()));
+        sign.setLine(3, CC.translate("&8Propietario"));
+    } else {
+        sign.setLine(2, CC.translate("&aEn venta"));
+        sign.setLine(3, CC.translate("&7$" + (int) terrain.getPrice()));
+    }
+}
+```
+
+### Permission System
+
+**Location:** `claims/managers/TerrainManager.java:291`
+
+```java
+public boolean canBuild(Terrain terrain, Player player) {
+    if (terrain == null) return true;  // No territory = allowed
+    if (player.hasPermission(ClaimsPermissions.ADMIN_BYPASS)) return true;
+    if (terrain.isOwner(player.getUniqueId())) return true;
+    return terrain.hasMemberRole(player.getUniqueId(), Terrain.MemberRole.BUILD);
+}
+
+public boolean canBreak(Terrain terrain, Player player) {
+    if (terrain == null) return true;
+    if (player.hasPermission(ClaimsPermissions.ADMIN_BYPASS)) return true;
+    if (terrain.isOwner(player.getUniqueId())) return true;
+    return terrain.hasMemberRole(player.getUniqueId(), Terrain.MemberRole.BREAK);
+}
+
+public boolean canOpenContainers(Terrain terrain, Player player) {
+    if (terrain == null) return true;
+    if (player.hasPermission(ClaimsPermissions.ADMIN_BYPASS)) return true;
+    if (terrain.isOwner(player.getUniqueId())) return true;
+    return terrain.hasMemberRole(player.getUniqueId(), Terrain.MemberRole.CONTAINERS);
+}
+```
+
+## Leasing System
+
+### LeaseManager
+
+**Location:** `claims/managers/LeaseManager.java:22`
+
+Advanced rental system for sub-territories:
+
+```java
+public class LeaseManager {
+    
+    public static final int MIN_CHUNKS_TO_LEASE = 4;       // Minimum parent size
+    public static final int MIN_CYCLE_DAYS = 3;            // Minimum payment cycle
+    public static final int MAX_CYCLE_DAYS = 20;           // Maximum payment cycle
+    public static final int GRACE_PERIOD_DAYS = 3;         // Days before eviction
+    public static final int PARENT_BORDER_MARGIN = 2;      // Blocks from parent edge
+    
+    /**
+     * Owner offers lease to tenant
+     */
+    public LeaseContract offerContract(Terrain parentTerrain, Player owner,
+                                      UUID tenantId, String tenantName,
+                                      int chunks, double price, int cycleDays) {
+        // Validate
+        if (parentTerrain.getChunks() < MIN_CHUNKS_TO_LEASE) return null;
+        if (cycleDays < MIN_CYCLE_DAYS || cycleDays > MAX_CYCLE_DAYS) return null;
+        if (chunks < 1 || chunks >= parentTerrain.getChunks()) return null;
+        
+        // Generate unique contract ID
+        String contractId = generateContractId(tenantName, parentTerrain.getId());
+        
+        // Create contract
+        LeaseContract contract = new LeaseContract(
+            contractId,
+            parentTerrain.getId(),
+            owner.getUniqueId(),
+            owner.getName(),
+            tenantId,
+            tenantName,
+            chunks,
+            price,
+            cycleDays,
+            LeaseContract.ContractOrigin.OWNER_OFFER
+        );
+        
+        contract.setStatus(LeaseContract.ContractStatus.PENDING_TENANT);
+        contracts.put(contractId, contract);
+        storage.saveContract(contract);
+        
+        return contract;
+    }
+    
+    /**
+     * Accept pending contract
+     */
+    public boolean acceptContract(LeaseContract contract, Player acceptor) {
+        if (contract == null) return false;
+        
+        if (contract.getStatus() == LeaseContract.ContractStatus.PENDING_TENANT) {
+            if (!contract.getTenantId().equals(acceptor.getUniqueId())) return false;
+        } else if (contract.getStatus() == LeaseContract.ContractStatus.PENDING_OWNER) {
+            if (!contract.getOwnerId().equals(acceptor.getUniqueId())) return false;
+        } else {
+            return false;
+        }
+        
+        contract.setStatus(LeaseContract.ContractStatus.AWAITING_SUBTERRAIN);
+        storage.saveContract(contract);
+        return true;
+    }
+}
+```
+
+### Sub-Territory Assignment
+
+**Location:** `claims/managers/LeaseManager.java:261`
+
+```java
+public boolean assignSubTerrainAtPos(LeaseContract contract, Player owner,
+                                    World world, int ox, int oz, int y) {
+    if (contract.getStatus() != LeaseContract.ContractStatus.AWAITING_SUBTERRAIN) 
+        return false;
+    if (!contract.getOwnerId().equals(owner.getUniqueId())) return false;
+    
+    // Generate sub-territory ID
+    String subId = generateSubTerrainId(contract.getParentTerrainId(), 
+                                       contract.getTenantName());
+    
+    // Create sub-territory
+    Terrain subTerrain = new Terrain(subId, contract.getChunks());
+    subTerrain.setPrice(contract.getPricePerCycle());
+    subTerrain.setOrigin(new Location(world, ox, y, oz));
+    subTerrain.setCommitted(true);
+    subTerrain.setOwner(contract.getTenantId());
+    subTerrain.setOwnerName(contract.getTenantName());
+    
+    // Register and save
+    TerrainManager.getInstance().getAll().put(subId, subTerrain);
+    TerrainManager.getInstance().save(subTerrain);
+    
+    // Build red wool borders (distinct from parent)
+    int size = contract.getChunks() * 16;
+    buildSubBorders(world, ox, oz, y, size);
+    placeSubSign(subTerrain, world, ox, oz, y, contract);
+    
+    // Link contract to sub-territory
+    contract.setSubTerrainId(subId);
+    
+    // Process first payment
+    Economy economy = TerrainManager.getInstance().getEconomy();
+    if (economy != null && economy.has(contract.getTenantName(), 
+                                       contract.getPricePerCycle())) {
+        economy.withdrawPlayer(contract.getTenantName(), contract.getPricePerCycle());
+        economy.depositPlayer(contract.getOwnerName(), contract.getPricePerCycle());
+    }
+    
+    // Activate contract
+    contract.activate();
+    storage.saveContract(contract);
+    
+    return true;
+}
+```
+
+### Automated Payment Processing
+
+**Location:** `claims/managers/LeaseManager.java:61`
+
+```java
+private void processCycles() {
+    List<LeaseContract> toProcess = new ArrayList<>(contracts.values());
+    
+    for (LeaseContract contract : toProcess) {
+        if (contract.getStatus() == LeaseContract.ContractStatus.ACTIVE 
+            && contract.isPaymentDue()) {
+            processPayment(contract);
+        } else if (contract.getStatus() == LeaseContract.ContractStatus.GRACE_PERIOD 
+                   && contract.isGraceExpired()) {
+            evictTenant(contract);
+        }
+    }
+}
+
+private void processPayment(LeaseContract contract) {
+    Economy economy = TerrainManager.getInstance().getEconomy();
+    if (economy == null) return;
+    
+    if (economy.has(contract.getTenantName(), contract.getPricePerCycle())) {
+        // Payment successful
+        economy.withdrawPlayer(contract.getTenantName(), contract.getPricePerCycle());
+        economy.depositPlayer(contract.getOwnerName(), contract.getPricePerCycle());
+        contract.renewPayment();
+        storage.saveContract(contract);
+        
+        // Notify both parties
+        notify(contract.getTenantName(), 
+               "&7[Contrato] Pago de &f$" + (int) contract.getPricePerCycle() + 
+               " &7debitado — &f" + contract.getSubTerrainId() + "&7.");
+        notify(contract.getOwnerName(), 
+               "&7[Contrato] Recibiste &f$" + (int) contract.getPricePerCycle() + 
+               " &7de &f" + contract.getTenantName() + "&7.");
+    } else {
+        // Payment failed - start grace period
+        contract.startGracePeriod();
+        storage.saveContract(contract);
+        
+        notify(contract.getTenantName(), 
+               "&c[Contrato] Sin fondos. Tienes &f" + GRACE_PERIOD_DAYS + 
+               " días &cpara pagar o desalojar.");
+        notify(contract.getOwnerName(), 
+               "&c[Contrato] &f" + contract.getTenantName() + 
+               " &cno pudo pagar. Período de gracia iniciado.");
+    }
+}
+
+private void evictTenant(LeaseContract contract) {
+    // Remove sub-territory
+    if (contract.getSubTerrainId() != null) {
+        removeSubBorders(contract.getSubTerrainId());
+        TerrainManager.getInstance().deleteTerrain(contract.getSubTerrainId());
+    }
+    
+    contract.setStatus(LeaseContract.ContractStatus.EXPIRED);
+    storage.saveContract(contract);
+    
+    // Notify both parties
+    notify(contract.getTenantName(), 
+           "&c[Contrato] Período de gracia expirado. Desalojado de &f" + 
+           contract.getSubTerrainId() + "&c.");
+    notify(contract.getOwnerName(), 
+           "&7[Contrato] &f" + contract.getTenantName() + 
+           " &7fue desalojado por falta de pago.");
+}
+```
+
+<Warning>
+**Payment Scheduler:** Runs every 5 minutes to check for due payments and grace period expirations. Ensure server has consistent uptime for accurate billing.
+</Warning>
+
+### Sub-Territory Relocation
+
+**Location:** `claims/managers/LeaseManager.java:293`
+
+```java
+public void requestMoveWithSelection(LeaseContract contract, Player owner,
+                                    World world, int ox, int oz, int y) {
+    contract.requestMove(world.getName(), ox, oz, 
+                        ox + contract.getChunks() * 16, 
+                        oz + contract.getChunks() * 16);
+    storage.saveContract(contract);
+    
+    notify(contract.getTenantName(), 
+           "&7[Contrato] El propietario solicita trasladar tu sub-terreno. "
+           + "Usa &f/lease acceptmove &7para aceptar o &f/lease declinemove &7para rechazar.");
+}
+
+public boolean acceptMove(String contractId, Player tenant) {
+    LeaseContract contract = contracts.get(contractId);
+    if (contract == null || !contract.getTenantId().equals(tenant.getUniqueId())) 
+        return false;
+    if (!contract.isHasPendingMove()) return false;
+    
+    World world = Bukkit.getWorld(contract.getPendingMoveWorld());
+    if (world == null) {
+        contract.clearPendingMove();
+        storage.saveContract(contract);
+        return false;
+    }
+    
+    // Validate new position
+    int ox = contract.getPendingMoveX1();
+    int oz = contract.getPendingMoveZ1();
+    int size = contract.getChunks() * 16;
+    
+    String valid = validateSelectionForMove(contract, world, ox, oz, size);
+    if (valid != null) {
+        contract.clearPendingMove();
+        storage.saveContract(contract);
+        tenant.sendMessage(CC.translate("&cEl traslado ya no es válido: &7" + valid));
+        return false;
+    }
+    
+    // Execute move
+    Terrain sub = TerrainManager.getInstance().getTerrain(contract.getSubTerrainId());
+    int y = sub.getOrigin() != null ? sub.getOrigin().getBlockY() 
+                                    : tenant.getLocation().getBlockY();
+    
+    doMoveSubTerrain(contract, world, ox, oz, y);
+    contract.clearPendingMove();
+    storage.saveContract(contract);
+    
+    return true;
+}
+```
+
+## Environmental Customization
+
+### TerrainCustomizeManager
+
+**Location:** `claims/managers/TerrainCustomizeManager.java:18`
+
+Allows territory owners to customize environmental settings:
+
+```java
+public class TerrainCustomizeManager {
+    
+    /**
+     * Change territory biome
+     */
+    public static boolean setBiome(final Terrain terrain, final Player player, 
+                                  final String biomeName) {
+        final Biome biome;
+        try {
+            biome = Biome.valueOf(biomeName.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            player.sendMessage(CC.translate("&cBioma desconocido: &f" + biomeName));
+            return false;
+        }
+        
+        final World world = terrain.getOrigin().getWorld();
+        final int ox = terrain.getOrigin().getBlockX();
+        final int oz = terrain.getOrigin().getBlockZ();
+        final int size = terrain.getSizeInBlocks();
+        
+        // Run asynchronously for performance
+        Bukkit.getScheduler().runTaskAsynchronously(Main.instance, () -> {
+            for (int x = ox; x < ox + size; x++) {
+                for (int z = oz; z < oz + size; z++) {
+                    world.setBiome(x, z, biome);
+                }
+            }
+            
+            // Refresh chunks on main thread
+            Bukkit.getScheduler().runTask(Main.instance, () -> {
+                for (int cx = ox >> 4; cx <= (ox + size) >> 4; cx++) {
+                    for (int cz = oz >> 4; cz <= (oz + size) >> 4; cz++) {
+                        world.refreshChunk(cx, cz);
+                    }
+                }
+                player.sendMessage(CC.translate(
+                    "&7Bioma del terreno &f" + terrain.getId() + 
+                    " &7cambiado a &f" + biomeName + "&7."));
+            });
+        });
+        
+        return true;
+    }
+    
+    /**
+     * Set territory time (player-specific)
+     */
+    public static void setTime(Terrain terrain, Player player, long ticks) {
+        terrainTime.put(terrain.getId(), ticks);
+        storage.setTime(terrain.getId(), ticks);
+        player.setPlayerTime(ticks, false);
+        player.sendMessage(CC.translate("&7Tiempo del terreno configurado."));
+    }
+    
+    /**
+     * Set territory weather
+     */
+    public static void setWeather(Terrain terrain, Player player, String type) {
+        World world = terrain.getOrigin().getWorld();
+        terrainWeather.put(terrain.getId(), type);
+        storage.setWeather(terrain.getId(), type);
+        
+        switch (type) {
+            case "CLEAR":
+                world.setStorm(false);
+                world.setThundering(false);
+                world.setWeatherDuration(Integer.MAX_VALUE);
+                break;
+            case "RAIN":
+                world.setStorm(true);
+                world.setThundering(false);
+                world.setWeatherDuration(Integer.MAX_VALUE);
+                break;
+            case "STORM":
+                world.setStorm(true);
+                world.setThundering(true);
+                world.setThunderDuration(Integer.MAX_VALUE);
+                world.setWeatherDuration(Integer.MAX_VALUE);
+                break;
+        }
+    }
+}
+```
+
+### Territory Rules
+
+**Location:** `claims/managers/TerrainCustomizeManager.java:31`
+
+```java
+private static final Map<String, Boolean> RULE_DEFAULTS = new HashMap<>();
+static {
+    RULE_DEFAULTS.put("pvp", true);
+    RULE_DEFAULTS.put("mobGriefing", true);
+    RULE_DEFAULTS.put("keepInventory", false);
+    RULE_DEFAULTS.put("doFireTick", true);
+    RULE_DEFAULTS.put("tntExplodes", true);
+    RULE_DEFAULTS.put("doMobSpawning", true);
+    RULE_DEFAULTS.put("naturalRegen", true);
+    RULE_DEFAULTS.put("doHunger", true);
+}
+
+public static boolean toggleRule(Terrain terrain, Player player, String ruleKey) {
+    Map<String, Boolean> rules = getRulesMap(terrain.getId());
+    boolean current = rules.getOrDefault(ruleKey, 
+                                        RULE_DEFAULTS.getOrDefault(ruleKey, true));
+    boolean newVal = !current;
+    rules.put(ruleKey, newVal);
+    storage.setRule(terrain.getId(), ruleKey, newVal);
+    return newVal;
+}
+```
+
+### Ambient Effects
+
+**Location:** `claims/managers/TerrainCustomizeManager.java:229`
+
+```java
+public static void applyEffectToPlayer(Player player) {
+    Terrain terrain = TerrainManager.getInstance().getTerrainAt(player.getLocation());
+    if (terrain == null) return;
+    
+    String effectName = getEffect(terrain);
+    if ("NONE".equals(effectName) || effectName.isEmpty()) return;
+    
+    PotionEffectType pet = getPotionEffectType(effectName);
+    if (pet == null) return;
+    
+    // Check if player already has effect
+    PotionEffect existing = null;
+    for (PotionEffect pe : player.getActivePotionEffects()) {
+        if (pe.getType().equals(pet)) {
+            existing = pe;
+            break;
+        }
+    }
+    
+    // Don't reapply if duration > 100 ticks
+    if (existing != null && existing.getDuration() > 100) return;
+    
+    // Apply effect (5 seconds, level 1, ambient)
+    player.addPotionEffect(new PotionEffect(pet, 300, 0, true), true);
+}
+
+private static PotionEffectType getPotionEffectType(String name) {
+    switch (name) {
+        case "REGENERATION": return PotionEffectType.REGENERATION;
+        case "SPEED": return PotionEffectType.SPEED;
+        case "INCREASE_DAMAGE": return PotionEffectType.INCREASE_DAMAGE;
+        case "WATER_BREATHING": return PotionEffectType.WATER_BREATHING;
+        case "NIGHT_VISION": return PotionEffectType.NIGHT_VISION;
+        case "INVISIBILITY": return PotionEffectType.INVISIBILITY;
+        case "SLOW": return PotionEffectType.SLOW;
+        default: return null;
+    }
+}
+```
+
+## Commands
+
+<Accordion title="/terrain - Territory management">
+  **Permission:** `debentialc.admin.terrain` (admin commands)
+  
+  **Admin Commands:**
+  - `/terrain create <id> <chunks>` - Create uncommitted territory
+  - `/terrain commit <id>` - Commit territory at your location
+  - `/terrain delete <id>` - Delete territory
+  - `/terrain setprice <id> <price>` - Set purchase price
+  - `/terrain list` - List all territories
+  - `/terrain info <id>` - View territory details
+  
+  **Owner Commands:**
+  - `/terrain buy` - Purchase territory you're standing in
+  - `/terrain sell` - Dissolve ownership (doesn't delete territory)
+  - `/terrain addmember <player> <role>` - Add member with role
+  - `/terrain removemember <player>` - Remove member
+  - `/terrain customize` - Open customization GUI
+</Accordion>
+
+<Accordion title="/lease - Leasing system">
+  **Permission:** (none - available to territory owners and tenants)
+  
+  **Owner Commands:**
+  - `/lease offer <player> <chunks> <price> <days>` - Offer lease
+  - `/lease cancel <contractId>` - Cancel contract
+  - `/lease move <tenant>` - Request sub-territory relocation
+  - `/lease evict <contractId>` - Force eviction (admin only)
+  
+  **Tenant Commands:**
+  - `/lease request <owner> <chunks> <price> <days>` - Request lease
+  - `/lease accept <owner>` - Accept pending contract
+  - `/lease acceptmove` - Accept relocation request
+  - `/lease declinemove` - Decline relocation
+  - `/lease pay` - Pay during grace period
+  - `/lease list` - View your contracts
+</Accordion>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Buffer Spacing" icon="arrows-left-right">
+    Always maintain 16-block buffer between territories to prevent overlap issues
+  </Card>
+  <Card title="Lease Pricing" icon="dollar-sign">
+    Set reasonable cycle prices that players can afford but that incentivize ownership
+  </Card>
+  <Card title="Grace Periods" icon="clock">
+    Use 3-day grace periods to give tenants time to resolve payment issues
+  </Card>
+  <Card title="Async Operations" icon="gears">
+    Biome changes run async to prevent server lag on large territories
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Territory borders not appearing">
+  **Solutions:**
+  1. Verify territory is committed: `/terrain info <id>`
+  2. Check if blocks were replaced by players
+  3. Recommit territory to regenerate borders
+  4. Ensure world is loaded when committing
+</Accordion>
+
+<Accordion title="Lease payments not processing">
+  **Solutions:**
+  1. Verify Vault is installed and economy provider is active
+  2. Check tenant has sufficient funds
+  3. Review payment scheduler in console logs
+  4. Manually trigger payment: `/lease pay`
+  5. Check contract status: `/lease list`
+</Accordion>
+
+<Accordion title="Biome changes not visible">
+  **Solutions:**
+  1. Players must relog or move out and back into territory
+  2. Force chunk reload: `/terrain customize` → Biome → reselect biome
+  3. Check console for async task completion
+  4. Verify biome name is valid Minecraft biome
+</Accordion>
+
+## Related Systems
+
+<CardGroup cols={2}>
+  <Card title="Boosters" href="/systems/boosters">
+    Apply territory-specific booster zones for VIP areas
+  </Card>
+  <Card title="Custom Items" href="/systems/custom-items">
+    Award claim deeds or lease contracts as custom items
+  </Card>
+</CardGroup>

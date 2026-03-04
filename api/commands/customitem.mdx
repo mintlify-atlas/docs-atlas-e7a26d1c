@@ -1,0 +1,528 @@
+---
+title: Custom Item Commands
+description: Complete reference for creating and managing custom items with stat bonuses and special effects
+---
+
+# Custom Item Commands
+
+The Custom Item system allows administrators to create unique items with custom stats, bonuses, and effects that integrate with the DBC (Dragon Block C) plugin.
+
+## Base Command
+
+### /customitem
+
+**Aliases:** `ci`
+
+**Permission:** `debentialc.command.ci`
+
+**Usage:** `/customitem <subcommand>`
+
+Main command for creating and managing custom items.
+
+---
+
+## Item Creation
+
+### /ci create
+
+**Usage:** `/ci create <id>`
+
+Creates a new custom item from the item you're currently holding.
+
+<ParamField path="id" type="string" required>
+  Unique identifier for the custom item. Must not already exist.
+</ParamField>
+
+**Requirements:**
+- Must be holding an item in your hand
+- Item must have metadata (name/lore)
+- ID must be unique
+
+**Example:**
+
+```bash
+# Hold a custom-named sword, then:
+/ci create legendary_sword
+```
+
+**Output:**
+
+```
+Item creado correctamente
+ID: legendary_sword
+```
+
+<Note>
+  The item's current name, lore, and material type are saved as the template for this custom item.
+</Note>
+
+---
+
+## Item Properties
+
+### /ci rename
+
+**Usage:** `/ci rename <new_name>`
+
+Renames the custom item you're currently holding.
+
+<ParamField path="new_name" type="string" required>
+  New display name for the item. Supports color codes with `&`.
+</ParamField>
+
+**Example:**
+
+```bash
+/ci rename &6&lLegendary Blade of Power
+```
+
+**Output:**
+
+```
+Nombre actualizado correctamente
+```
+
+---
+
+### /ci addline
+
+**Usage:** `/ci addline <text>`
+
+Adds a new line to the lore of the custom item you're holding.
+
+<ParamField path="text" type="string" required>
+  Text to append to the item's lore. Supports color codes with `&`.
+</ParamField>
+
+**Example:**
+
+```bash
+/ci addline &7A sword forged in ancient times
+/ci addline &8Grants immense power to its wielder
+```
+
+**Output:**
+
+```
+Lore actualizado correctamente
+```
+
+---
+
+### /ci setline
+
+**Usage:** `/ci setline <line> <text>`
+
+Replaces a specific line in the item's lore.
+
+<ParamField path="line" type="integer" required>
+  Line number to replace (1-based indexing)
+</ParamField>
+
+<ParamField path="text" type="string" required>
+  New text for the line. Supports color codes.
+</ParamField>
+
+**Example:**
+
+```bash
+# Replace the second line of lore
+/ci setline 2 &eRare quality item
+```
+
+**Output:**
+
+```
+Lore actualizado correctamente
+```
+
+<Warning>
+  Line numbers start at 1. Invalid line numbers will return an error.
+</Warning>
+
+---
+
+## Stat Bonuses
+
+Custom items can provide stat bonuses using three different operations:
+
+### /ci plus
+
+**Usage:** `/ci plus <id> <value> <stat>`
+
+Adds an additive bonus (+) to a stat.
+
+<ParamField path="id" type="string" required>
+  ID of the custom item to modify
+</ParamField>
+
+<ParamField path="value" type="number" required>
+  Numeric value to add to the stat
+</ParamField>
+
+<ParamField path="stat" type="string" required>
+  Stat name: `str` (Strength), `con` (Constitution), `dex` (Dexterity), `will` (Willpower), `mnd` (Mind)
+</ParamField>
+
+**Example:**
+
+```bash
+# Add +50 Strength
+/ci plus legendary_sword 50 str
+
+# Add +25 Constitution
+/ci plus legendary_sword 25 con
+```
+
+**Output:**
+
+```
+Bonificación correctamente aplicada
+```
+
+---
+
+### /ci less
+
+**Usage:** `/ci less <id> <value> <stat>`
+
+Adds a subtractive modifier (-) to a stat.
+
+<ParamField path="id" type="string" required>
+  ID of the custom item to modify
+</ParamField>
+
+<ParamField path="value" type="number" required>
+  Numeric value to subtract from the stat
+</ParamField>
+
+<ParamField path="stat" type="string" required>
+  Stat name (same as `/ci plus`)
+</ParamField>
+
+**Example:**
+
+```bash
+# Subtract 10 Dexterity (cursed item)
+/ci less cursed_armor 10 dex
+```
+
+**Output:**
+
+```
+Bonificación correctamente aplicada
+```
+
+---
+
+### /ci percentage
+
+**Usage:** `/ci percentage <id> <value> <stat>`
+
+Adds a percentage-based multiplier (*) to a stat.
+
+<ParamField path="id" type="string" required>
+  ID of the custom item to modify
+</ParamField>
+
+<ParamField path="value" type="number" required>
+  Multiplier value (e.g., 1.5 for 150%, 2.0 for 200%)
+</ParamField>
+
+<ParamField path="stat" type="string" required>
+  Stat name (same as `/ci plus`)
+</ParamField>
+
+**Example:**
+
+```bash
+# Multiply Strength by 1.5 (150%)
+/ci percentage legendary_sword 1.5 str
+
+# Double Willpower (200%)
+/ci percentage mage_staff 2.0 will
+```
+
+**Output:**
+
+```
+Bonificación correctamente aplicada
+```
+
+<Note>
+  **Stat abbreviations:**
+  - `str` - Strength
+  - `con` - Constitution
+  - `dex` - Dexterity
+  - `will` - Willpower
+  - `mnd` - Mind
+</Note>
+
+---
+
+## Special Effects
+
+### /ci effect
+
+**Usage:** `/ci effect <type> <value>`
+
+Adds a special regeneration effect to the item you're holding.
+
+<ParamField path="type" type="string" required>
+  Effect type: `HEALTHREGEN`, `KIREGEN`, or `STAMINAREGEN`
+</ParamField>
+
+<ParamField path="value" type="number" required>
+  Percentage value (e.g., 0.10 for 10% bonus regeneration)
+</ParamField>
+
+**Example:**
+
+```bash
+# Add 15% health regeneration
+/ci effect HEALTHREGEN 0.15
+
+# Add 25% ki regeneration  
+/ci effect KIREGEN 0.25
+
+# Add 10% stamina regeneration
+/ci effect STAMINAREGEN 0.10
+```
+
+**Output:**
+
+```
+Efecto agregado correctamente
+```
+
+<Accordion title="Available Effect Types">
+  - **HEALTHREGEN** - Increases health regeneration rate
+  - **KIREGEN** - Increases ki regeneration rate
+  - **STAMINAREGEN** - Increases stamina regeneration rate
+</Accordion>
+
+---
+
+## Item Distribution
+
+### /ci give
+
+**Usage:** `/ci give <id> <player> <amount>`
+
+Gives a custom item to a player.
+
+<ParamField path="id" type="string" required>
+  ID of the custom item to give
+</ParamField>
+
+<ParamField path="player" type="string" required>
+  Target player's username (must be online)
+</ParamField>
+
+<ParamField path="amount" type="integer" default="1">
+  Number of items to give (must be positive)
+</ParamField>
+
+**Example:**
+
+```bash
+# Give 1 legendary sword
+/ci give legendary_sword Steve 1
+
+# Give 5 healing potions
+/ci give healing_potion Alex 5
+```
+
+**Output (sender):**
+
+```
+Entregado 5x healing_potion a Alex
+```
+
+**Output (recipient):**
+
+```
+Recibiste: 5x Healing Potion
+```
+
+<Warning>
+  The player must be online to receive items.
+</Warning>
+
+---
+
+## Item Management
+
+### /ci list
+
+**Usage:** `/ci list [page]`
+
+Lists all registered custom items.
+
+<ParamField path="page" type="integer" default="1">
+  Page number to display (7 items per page)
+</ParamField>
+
+**Example:**
+
+```bash
+# View first page
+/ci list
+
+# View page 2
+/ci list 2
+```
+
+**Output:**
+
+```
+──────────────────────────────────────
+Items Custom Registrados
+Página 1 / 3
+──────────────────────────────────────
+legendary_sword - Legendary Blade of Power
+healing_potion - Healing Potion
+mage_staff - Staff of the Archmage
+──────────────────────────────────────
+```
+
+---
+
+### /ci info
+
+**Usage:** `/ci info`
+
+Displays detailed information about the custom item you're currently holding.
+
+**Example:**
+
+```bash
+/ci info
+```
+
+**Output:**
+
+```
+──────────────────────────────────────
+Info del Item
+──────────────────────────────────────
+ID: legendary_sword
+Nombre: Legendary Blade of Power
+Material: 276
+Lore: 3 líneas
+Stats:
+  str +50
+  con +25
+  dex *1.5
+Efectos:
+  HEALTHREGEN: 15.0%
+──────────────────────────────────────
+```
+
+---
+
+### /ci delete
+
+**Aliases:** `remove`
+
+**Usage:** `/ci delete <id>`
+
+Removes a custom item from the registry.
+
+<ParamField path="id" type="string" required>
+  ID of the custom item to delete
+</ParamField>
+
+**Example:**
+
+```bash
+/ci delete old_item
+```
+
+**Output:**
+
+```
+Item eliminado correctamente
+```
+
+<Warning>
+  This only removes the item template from the registry. Existing item instances in player inventories will remain but will no longer be recognized as custom items.
+</Warning>
+
+---
+
+## Help Command
+
+### /ci help
+
+**Usage:** `/ci help`
+
+Displays the complete help menu with all available commands.
+
+**Output:**
+
+```
+──────────────────────────────────────
+Custom Item - Help Menu
+──────────────────────────────────────
+Usa /ci <subcomando> para gestionar items.
+
+/ci create <id> - Crear un item custom
+/ci delete <id> - Eliminar un item registrado
+/ci addline <texto> - Agregar lore al item en mano
+/ci setline <línea> <texto> - Editar una línea de lore
+/ci rename <texto> - Cambiar el nombre del item
+
+/ci plus <id> <valor> <stat> - Bonus aditivo (+)
+/ci less <id> <valor> <stat> - Bonus sustractivo (-)
+/ci percentage <id> <valor> <stat> - Bonus multiplicativo (*)
+/ci effect <tipo> <valor> - Agregar efecto especial (%)
+
+/ci list [página] - Listar todos los items
+/ci info - Ver info del item en mano
+/ci give <item_id> <jugador> <cantidad> - Dar un item custom a un jugador
+
+Stats: str, con, dex, will, mnd
+Efectos: HEALTHREGEN, KIREGEN, STAMINAREGEN
+──────────────────────────────────────
+```
+
+---
+
+## Implementation Details
+
+### Source Files
+
+- **CustomItemCommand.java** - Line 33: Main command handler
+- **CustomItem.java** - Item model class
+- **CustomItemStorage.java** - Persistence layer
+
+### Stat Operations
+
+Stats are applied in the following order:
+
+1. **Addition (+)** - Applied first
+2. **Subtraction (-)** - Applied second
+3. **Multiplication (*)** - Applied last
+
+Example:
+```java
+// Base stat: 100
+// Plus: +50
+// Less: -10
+// Percentage: *1.5
+// Result: ((100 + 50 - 10) * 1.5) = 210
+```
+
+### Item Identification
+
+Custom items are identified by matching:
+- Material ID
+- Display name
+- Lore content
+
+This means items maintain their custom properties even after server restarts.
+
+### Storage Format
+
+Custom items are stored in `CustomItemStorage` and persisted across server restarts. Changes take effect immediately.

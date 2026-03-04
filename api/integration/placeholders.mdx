@@ -1,0 +1,512 @@
+---
+title: PlaceholderAPI Integration
+description: Complete reference for Debentialc PlaceholderAPI placeholders
+---
+
+## Overview
+
+Debentialc provides extensive PlaceholderAPI integration for displaying booster information in chat, scoreboards, holograms, and other plugins.
+
+<Note>
+  Requires [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/) to be installed on your server.
+</Note>
+
+## Installation
+
+Placeholders are automatically registered when the plugin loads. No additional setup is required.
+
+## Placeholder Format
+
+All placeholders use the format: `%boosters_<placeholder>%`
+
+## Available Placeholders
+
+### Global Booster Placeholders
+
+These placeholders show information about server-wide boosters.
+
+#### %boosters_global_active%
+
+Shows if a global booster is currently active.
+
+```yaml
+# Scoreboard example
+lines:
+  - "Global Booster: %boosters_global_active%"
+```
+
+<ResponseField name="output" type="String">
+  - `§aActivo` - Booster is active
+  - `§cInactivo` - No booster active
+</ResponseField>
+
+#### %boosters_global_multiplier%
+
+Displays the current global multiplier.
+
+```yaml
+# Chat format example
+format: "&aReward: {amount} coins &7(%boosters_global_multiplier%)"
+```
+
+<ResponseField name="output" type="String">
+  - `§62.00x` - Active multiplier
+  - `§60.00x` - No booster (shows 0 not 1.0)
+</ResponseField>
+
+#### %boosters_global_percentage%
+
+Shows the global boost as a percentage.
+
+```yaml
+# Hologram example
+lines:
+  - "&6&lGlobal Boost"
+  - "%boosters_global_percentage%"
+```
+
+<ResponseField name="output" type="String">
+  - `§a+150%` - 2.5x multiplier
+  - `§70%` - No boost
+</ResponseField>
+
+#### %boosters_global_time%
+
+Displays remaining time for the global booster.
+
+```yaml
+lines:
+  - "Expires: %boosters_global_time%"
+```
+
+<ResponseField name="output" type="String">
+  - `§61h 30m 45s` - Formatted time remaining
+  - `§cExpirado` - Booster expired or none active
+</ResponseField>
+
+#### %boosters_global_activator%
+
+Shows who activated the current global booster.
+
+```yaml
+lines:
+  - "Activated by: %boosters_global_activator%"
+```
+
+<ResponseField name="output" type="String">
+  - `§6PlayerName` - Name of activator
+  - `§7Ninguno` - No active booster
+</ResponseField>
+
+### Personal Booster Placeholders
+
+These placeholders show player-specific booster information.
+
+<Warning>
+  Personal placeholders require a player context and will return empty strings if used in non-player contexts.
+</Warning>
+
+#### %boosters_personal_active%
+
+Shows if the player has an active personal booster.
+
+```yaml
+# TAB plugin example
+tablist:
+  header:
+    - "Your Booster: %boosters_personal_active%"
+```
+
+<ResponseField name="output" type="String">
+  - `§aActivo` - Player has active booster
+  - `§cInactivo` - No active booster
+</ResponseField>
+
+#### %boosters_personal_multiplier%
+
+Displays the player's personal multiplier.
+
+```yaml
+format: "Personal: %boosters_personal_multiplier%"
+```
+
+<ResponseField name="output" type="String">
+  - `§62.50x` - Active multiplier
+  - `§61.00x` - No booster
+</ResponseField>
+
+#### %boosters_personal_percentage%
+
+Shows the personal boost as a percentage.
+
+```yaml
+lines:
+  - "&eYour Boost: %boosters_personal_percentage%"
+```
+
+<ResponseField name="output" type="String">
+  - `§a+100%` - 2x multiplier  
+  - `§70%` - No boost
+</ResponseField>
+
+#### %boosters_personal_level%
+
+Displays the name/level of the active personal booster.
+
+```yaml
+lines:
+  - "Booster: %boosters_personal_level%"
+```
+
+<ResponseField name="output" type="String">
+  Possible values:
+  - `§6Minor` - Level 1 booster
+  - `§6Standard` - Level 2 booster
+  - `§6Powerful` - Level 3 booster
+  - `§6Extreme` - Level 4 booster
+  - `§6Ultimate` - Level 5 booster
+  - `§7Ninguno` - No booster active
+</ResponseField>
+
+#### %boosters_personal_time%
+
+Shows remaining time for the player's active booster.
+
+```yaml
+actionbar: "Booster: %boosters_personal_time%"
+```
+
+<ResponseField name="output" type="String">
+  - `§645m 30s` - Time remaining
+  - `§cInactivo` - No active booster
+</ResponseField>
+
+#### %boosters_personal_count%
+
+Shows how many boosters the player has in inventory.
+
+```yaml
+lines:
+  - "Boosters: %boosters_personal_count%"
+```
+
+<ResponseField name="output" type="String">
+  - `§63` - Number of boosters
+  - `§60` - No boosters
+</ResponseField>
+
+### Combined Placeholders
+
+These show the combined effect of global and personal boosters.
+
+#### %boosters_combined_multiplier%
+
+Displays the total multiplier (global × personal).
+
+```yaml
+# Reward message
+message: "&aTotal Multiplier: %boosters_combined_multiplier%"
+```
+
+<ResponseField name="output" type="String">
+  - `§64.00x` - Combined 2x global × 2x personal
+  - `§61.00x` - No boosters active
+</ResponseField>
+
+<Tip>
+  This is the most useful placeholder for showing players their total boost.
+</Tip>
+
+#### %boosters_combined_percentage%
+
+Shows combined boost as a percentage.
+
+```yaml
+format: "&7[%boosters_combined_percentage%&7]"
+```
+
+<ResponseField name="output" type="String">
+  - `§a+300%` - 4x total multiplier
+  - `§70%` - No boosts
+</ResponseField>
+
+#### %boosters_any_active%
+
+Checks if ANY booster is active (global or personal).
+
+```yaml
+lines:
+  - "Boosters: %boosters_any_active%"
+```
+
+<ResponseField name="output" type="String">
+  - `§aActivo` - At least one booster active
+  - `§cInactivo` - No boosters active
+</ResponseField>
+
+## Integration Examples
+
+### Scoreboard (FeatherBoard)
+
+```yaml
+boards:
+  main:
+    lines:
+      - "&6&m--------------------"
+      - "&e&lBOOSTERS"
+      - ""
+      - "&7Global: %boosters_global_multiplier%"
+      - "&7Personal: %boosters_personal_multiplier%"
+      - "&7Combined: &f%boosters_combined_multiplier%"
+      - ""
+      - "&7Time: %boosters_global_time%"
+      - "&6&m--------------------"
+```
+
+### Chat Format (EssentialsX)
+
+```yaml
+format: '{DISPLAYNAME}&r: {MESSAGE} &7[%boosters_combined_percentage%&7]'
+```
+
+Example output:
+```
+Player: Hello! [§a+200%§7]
+```
+
+### TAB Header/Footer
+
+```yaml
+header:
+  - ""
+  - "&6&lSERVER BOOSTERS"
+  - "&7Global: %boosters_global_active% &f%boosters_global_multiplier%"
+  - "&7Your Boost: %boosters_personal_active% &f%boosters_personal_multiplier%"
+  - ""
+
+footer:
+  - ""
+  - "&7Total Boost: &f%boosters_combined_multiplier%"
+  - ""
+```
+
+### Hologram (HolographicDisplays)
+
+```yaml
+holograms:
+  booster_info:
+    location: world, 100, 64, 100
+    lines:
+      - "&6&l✦ &e&lGLOBAL BOOSTER &6&l✦"
+      - ""
+      - "&7Status: %boosters_global_active%"
+      - "&7Multiplier: &f%boosters_global_multiplier%"
+      - "&7Bonus: %boosters_global_percentage%"
+      - ""
+      - "&7Remaining: &f%boosters_global_time%"
+      - "&7Activated by: %boosters_global_activator%"
+```
+
+### Action Bar (ActionAnnouncer)
+
+```yaml
+announcements:
+  booster_status:
+    interval: 60
+    type: actionbar
+    message: "&6Booster: %boosters_combined_multiplier% &7| Expires: %boosters_global_time%"
+```
+
+### Boss Bar (BossBarAPI)
+
+```yaml
+bars:
+  booster:
+    enabled: true
+    message: "&6&lGLOBAL BOOSTER: %boosters_global_multiplier% &7- %boosters_global_time%"
+    color: YELLOW
+    style: SOLID
+    progress: 1.0
+```
+
+### Title Message (TitleManager)
+
+```yaml
+titles:
+  booster_activated:
+    title: "&6&lBOOSTER ACTIVATED"
+    subtitle: "%boosters_global_multiplier% &7for &f%boosters_global_time%"
+    fadeIn: 10
+    stay: 60
+    fadeOut: 10
+```
+
+### Custom Join Message
+
+```yaml
+join-message: "&a{PLAYER} &7joined &8[&7%boosters_global_active%&8]"
+```
+
+### Reward Notification
+
+```yaml
+reward:
+  message:
+    - "&a&l+ {amount} COINS"
+    - "&7Booster: %boosters_combined_percentage%"
+    - "&7Multiplier: %boosters_combined_multiplier%"
+```
+
+## Complete Booster Info Display
+
+Here's a complete example showing all booster information:
+
+```yaml
+# Hologram showing complete booster status
+lines:
+  - "&6&l━━━━━━━━━━━━━━━━━━━━"
+  - ""
+  - "&e&lGLOBAL BOOSTER"
+  - "&7Status: %boosters_global_active%"
+  - "&7Multiplier: &f%boosters_global_multiplier%"
+  - "&7Percentage: %boosters_global_percentage%"
+  - "&7Time Left: &f%boosters_global_time%"
+  - "&7Activated By: %boosters_global_activator%"
+  - ""
+  - "&e&lYOUR PERSONAL BOOSTER"
+  - "&7Status: %boosters_personal_active%"
+  - "&7Level: %boosters_personal_level%"
+  - "&7Multiplier: &f%boosters_personal_multiplier%"
+  - "&7Percentage: %boosters_personal_percentage%"
+  - "&7Time Left: &f%boosters_personal_time%"
+  - "&7In Inventory: &f%boosters_personal_count%"
+  - ""
+  - "&e&lCOMBINED EFFECT"
+  - "&7Total Multiplier: &f%boosters_combined_multiplier%"
+  - "&7Total Bonus: %boosters_combined_percentage%"
+  - "&7Any Active: %boosters_any_active%"
+  - ""
+  - "&6&l━━━━━━━━━━━━━━━━━━━━"
+```
+
+## Conditional Display
+
+Some placeholder plugins support conditional display:
+
+### DeluxeMenus Example
+
+```yaml
+menu:
+  items:
+    booster_status:
+      material: BEACON
+      slot: 13
+      display_name: "&6Active Boosters"
+      lore:
+        - ""
+        - "%checkitem_boosters_global_active~§aActivo%&7Global: %boosters_global_multiplier%%checkitem_end%"
+        - "%checkitem_boosters_personal_active~§aActivo%&7Personal: %boosters_personal_multiplier%%checkitem_end%"
+        - ""
+        - "&7Total: &f%boosters_combined_multiplier%"
+```
+
+### ConditionalEvents Example
+
+```yaml
+events:
+  reward_with_booster:
+    type: player_command
+    conditions:
+      - "%boosters_any_active% == §aActivo"
+    actions:
+      execute_as_player:
+        - "tell &aYou received a boosted reward!"
+        - "tell &7Multiplier: %boosters_combined_multiplier%"
+```
+
+## API Implementation
+
+The placeholders are implemented in `BoosterPlaceholder.java`:
+
+```java:src/main/java/org/debentialc/boosters/placeholders/BoosterPlaceholder.java
+public class BoosterPlaceholder extends PlaceholderExpansion {
+    
+    @Override
+    public String getIdentifier() {
+        return "boosters";
+    }
+    
+    @Override
+    public String onPlaceholderRequest(Player player, String identifier) {
+        // Handle placeholder requests
+    }
+}
+```
+
+## Best Practices
+
+<Tip>
+  **Use Combined Placeholders**: For reward displays, use `%boosters_combined_multiplier%` as it shows the total effect.
+</Tip>
+
+<Note>
+  **Update Frequency**: Placeholders update in real-time. For scoreboards, consider using a 1-second refresh rate for time displays.
+</Note>
+
+<Warning>
+  **Player Context**: Personal placeholders (`personal_*`, `combined_*`, `any_active` with player) require a player context and will return empty in server-wide displays.
+</Warning>
+
+<Tip>
+  **Color Coding**: The placeholders include color codes (§a for positive, §c for negative/inactive). Plan your formats accordingly.
+</Tip>
+
+## Troubleshooting
+
+### Placeholders Show as %boosters_...
+
+1. Ensure PlaceholderAPI is installed
+2. Check plugin loaded successfully: `/papi list`
+3. Verify expansion registered: `/papi info boosters`
+4. Reload PlaceholderAPI: `/papi reload`
+
+### Placeholders Return Empty
+
+For personal placeholders:
+- Ensure you're using them in a player context
+- Check the player has the required permissions
+- Verify the plugin is loaded: `/plugins`
+
+### Time Not Updating
+
+If time placeholders don't update:
+- Check your placeholder refresh rate in your plugin config
+- For scoreboards, ensure update interval is set (recommended: 20 ticks)
+- Verify boosters are actually active: `/booster status`
+
+## Reference Table
+
+| Placeholder | Requires Player | Description | Example Output |
+|------------|----------------|-------------|----------------|
+| `global_active` | No | Global booster status | §aActivo |
+| `global_multiplier` | No | Global multiplier | §62.00x |
+| `global_percentage` | No | Global percentage | §a+100% |
+| `global_time` | No | Time remaining | §61h 30m 45s |
+| `global_activator` | No | Who activated | §6Admin |
+| `personal_active` | Yes | Personal status | §aActivo |
+| `personal_multiplier` | Yes | Personal multiplier | §62.50x |
+| `personal_percentage` | Yes | Personal percentage | §a+150% |
+| `personal_level` | Yes | Booster level name | §6Powerful |
+| `personal_time` | Yes | Personal time left | §645m 30s |
+| `personal_count` | Yes | Booster inventory count | §63 |
+| `combined_multiplier` | Yes | Total multiplier | §65.00x |
+| `combined_percentage` | Yes | Total percentage | §a+400% |
+| `any_active` | Optional | Any booster active | §aActivo |
+
+## Support
+
+For issues with placeholders:
+1. Check PlaceholderAPI is installed and updated
+2. Verify Debentialc is running: `/plugins`
+3. Test placeholder directly: `/papi parse me %boosters_global_multiplier%`
+4. Check console for errors during plugin load

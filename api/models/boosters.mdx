@@ -1,0 +1,379 @@
+---
+title: Booster Models
+description: Data models for the booster system including global and personal boosters
+---
+
+The booster system provides temporary multipliers that enhance player rewards and experience. There are two types of boosters: global boosters that affect all players on the server, and personal boosters that only affect individual players.
+
+## GlobalBooster
+
+Represents a server-wide booster that affects all online players.
+
+### Package
+
+```java
+org.debentialc.boosters.models.GlobalBooster
+```
+
+### Fields
+
+<ResponseField name="multiplier" type="double" required>
+  The multiplier value applied to rewards (e.g., 1.5 = 50% bonus)
+</ResponseField>
+
+<ResponseField name="startTime" type="Instant">
+  The timestamp when the booster was activated
+</ResponseField>
+
+<ResponseField name="endTime" type="Instant">
+  The timestamp when the booster expires
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether the booster is currently active
+</ResponseField>
+
+<ResponseField name="activatedBy" type="String">
+  The name or identifier of who activated the booster
+</ResponseField>
+
+### Constructors
+
+<ParamField path="GlobalBooster()" type="constructor">
+  Creates an inactive global booster with default values.
+</ParamField>
+
+<ParamField path="GlobalBooster(multiplier, startTime, endTime, activatedBy)" type="constructor">
+  Creates an active global booster with specified parameters.
+  
+  **Parameters:**
+  - `multiplier` (double): The multiplier value
+  - `startTime` (Instant): When the booster starts
+  - `endTime` (Instant): When the booster expires
+  - `activatedBy` (String): Who activated the booster
+</ParamField>
+
+### Methods
+
+#### getRemainingSeconds()
+
+Returns the number of seconds remaining until the booster expires.
+
+```java
+public long getRemainingSeconds()
+```
+
+**Returns:** `long` - Remaining seconds, or 0 if inactive/expired
+
+**Source:** `GlobalBooster.java:27`
+
+---
+
+#### hasExpired()
+
+Checks if the booster has expired.
+
+```java
+public boolean hasExpired()
+```
+
+**Returns:** `boolean` - `true` if the booster is inactive or past its end time
+
+**Source:** `GlobalBooster.java:33`
+
+---
+
+#### deactivate()
+
+Manually deactivates the booster.
+
+```java
+public void deactivate()
+```
+
+**Source:** `GlobalBooster.java:38`
+
+---
+
+#### getFormattedTime()
+
+Returns the remaining time in a human-readable format (e.g., "2h 30m 15s").
+
+```java
+public String getFormattedTime()
+```
+
+**Returns:** `String` - Formatted time string with hours, minutes, and seconds
+
+**Example:**
+```java
+GlobalBooster booster = new GlobalBooster(1.5, Instant.now(), Instant.now().plusSeconds(9000), "Admin");
+System.out.println(booster.getFormattedTime()); // "2h 30m"
+```
+
+**Source:** `GlobalBooster.java:42`
+
+---
+
+#### getPercentageBonus()
+
+Converts the multiplier to a percentage bonus.
+
+```java
+public int getPercentageBonus()
+```
+
+**Returns:** `int` - Percentage bonus (e.g., multiplier 1.5 returns 50)
+
+**Example:**
+```java
+GlobalBooster booster = new GlobalBooster(2.0, Instant.now(), Instant.now().plusSeconds(3600), "Admin");
+int bonus = booster.getPercentageBonus(); // Returns 100 (100% bonus)
+```
+
+**Source:** `GlobalBooster.java:57`
+
+---
+
+## PersonalBooster
+
+Represents a player-specific booster that only affects individual player rewards.
+
+### Package
+
+```java
+org.debentialc.boosters.models.PersonalBooster
+```
+
+### Fields
+
+<ResponseField name="playerId" type="UUID" required>
+  The unique identifier of the player who owns this booster
+</ResponseField>
+
+<ResponseField name="level" type="int" required>
+  The booster level (1-5), which determines its strength
+  - 1: Minor
+  - 2: Standard
+  - 3: Powerful
+  - 4: Extreme
+  - 5: Ultimate
+</ResponseField>
+
+<ResponseField name="multiplier" type="double" required>
+  The multiplier value applied to rewards
+</ResponseField>
+
+<ResponseField name="activationTime" type="Instant">
+  When the booster was activated
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether the booster is currently active
+</ResponseField>
+
+<ResponseField name="creationTime" type="Instant">
+  When the booster was created/obtained
+</ResponseField>
+
+### Constructors
+
+<ParamField path="PersonalBooster()" type="constructor">
+  Creates an inactive personal booster with default values.
+</ParamField>
+
+<ParamField path="PersonalBooster(playerId, level, multiplier)" type="constructor">
+  Creates a new personal booster for a player.
+  
+  **Parameters:**
+  - `playerId` (UUID): The player's unique ID
+  - `level` (int): The booster level (1-5)
+  - `multiplier` (double): The multiplier value
+</ParamField>
+
+### Methods
+
+#### activate()
+
+Activates the booster for a specified duration.
+
+```java
+public void activate(long durationSeconds)
+```
+
+**Parameters:**
+- `durationSeconds` (long): How long the booster should remain active
+
+**Source:** `PersonalBooster.java:30`
+
+---
+
+#### deactivate()
+
+Manually deactivates the booster.
+
+```java
+public void deactivate()
+```
+
+**Source:** `PersonalBooster.java:35`
+
+---
+
+#### isStillActive()
+
+Checks if the booster is still active based on its duration.
+
+```java
+public boolean isStillActive(long durationSeconds)
+```
+
+**Parameters:**
+- `durationSeconds` (long): The total duration the booster should last
+
+**Returns:** `boolean` - `true` if the booster is active and not expired
+
+**Source:** `PersonalBooster.java:39`
+
+---
+
+#### getActivationTimeRemaining()
+
+Returns how much time is left before the booster expires.
+
+```java
+public long getActivationTimeRemaining(long durationSeconds)
+```
+
+**Parameters:**
+- `durationSeconds` (long): The total duration the booster should last
+
+**Returns:** `long` - Remaining seconds, or 0 if inactive/expired
+
+**Source:** `PersonalBooster.java:45`
+
+---
+
+#### hasExpiredFromStorage()
+
+Checks if the booster has exceeded its storage lifetime.
+
+```java
+public boolean hasExpiredFromStorage(long storageDays)
+```
+
+**Parameters:**
+- `storageDays` (long): Maximum days a booster can be stored before expiring
+
+**Returns:** `boolean` - `true` if the booster is too old
+
+**Source:** `PersonalBooster.java:52`
+
+---
+
+#### getStorageTimeRemaining()
+
+Returns how much time is left before the booster expires from storage.
+
+```java
+public long getStorageTimeRemaining(long storageDays)
+```
+
+**Parameters:**
+- `storageDays` (long): Maximum storage days
+
+**Returns:** `long` - Remaining seconds until storage expiration
+
+**Source:** `PersonalBooster.java:58`
+
+---
+
+#### getPercentageBonus()
+
+Converts the multiplier to a percentage bonus.
+
+```java
+public int getPercentageBonus()
+```
+
+**Returns:** `int` - Percentage bonus
+
+**Source:** `PersonalBooster.java:65`
+
+---
+
+#### getLevelName()
+
+Returns the human-readable name for the booster's level.
+
+```java
+public String getLevelName()
+```
+
+**Returns:** `String` - Level name ("Minor", "Standard", "Powerful", "Extreme", "Ultimate", or "Unknown")
+
+**Example:**
+```java
+PersonalBooster booster = new PersonalBooster(playerUuid, 3, 1.75);
+String levelName = booster.getLevelName(); // Returns "Powerful"
+```
+
+**Source:** `PersonalBooster.java:69`
+
+---
+
+## Usage Examples
+
+### Creating and Activating a Global Booster
+
+```java
+import org.debentialc.boosters.models.GlobalBooster;
+import java.time.Instant;
+
+// Create a 50% bonus booster for 1 hour
+Instant start = Instant.now();
+Instant end = start.plusSeconds(3600);
+GlobalBooster booster = new GlobalBooster(1.5, start, end, "ServerAdmin");
+
+// Check status
+if (booster.isActive() && !booster.hasExpired()) {
+    System.out.println("Booster active: " + booster.getPercentageBonus() + "% bonus");
+    System.out.println("Time remaining: " + booster.getFormattedTime());
+}
+```
+
+### Managing Personal Boosters
+
+```java
+import org.debentialc.boosters.models.PersonalBooster;
+import java.util.UUID;
+
+UUID playerId = player.getUniqueId();
+
+// Create a level 3 booster with 75% bonus
+PersonalBooster booster = new PersonalBooster(playerId, 3, 1.75);
+
+// Activate for 30 minutes
+long duration = 1800; // 30 minutes in seconds
+booster.activate(duration);
+
+// Check if still active
+if (booster.isStillActive(duration)) {
+    long remaining = booster.getActivationTimeRemaining(duration);
+    player.sendMessage("Your " + booster.getLevelName() + " booster has " + remaining + " seconds remaining!");
+}
+```
+
+### Checking Storage Expiration
+
+```java
+long maxStorageDays = 30;
+
+if (booster.hasExpiredFromStorage(maxStorageDays)) {
+    System.out.println("Booster has expired from storage");
+} else {
+    long remainingSeconds = booster.getStorageTimeRemaining(maxStorageDays);
+    long remainingDays = remainingSeconds / 86400;
+    System.out.println("Booster expires in " + remainingDays + " days");
+}
+```

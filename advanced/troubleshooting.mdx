@@ -1,0 +1,555 @@
+---
+title: 'Troubleshooting Guide'
+description: 'Solutions to common issues with the Debentialc plugin'
+---
+
+## Common Issues
+
+### Plugin Not Loading
+
+<AccordionGroup>
+  <Accordion title="Plugin fails to enable">
+    **Symptoms**:
+    - Red error message in console
+    - Plugin shows red in `/plugins` list
+    - Commands not working
+    
+    **Common causes**:
+    
+    1. **Java version incompatibility**
+       ```
+       Check your Java version: java -version
+       Required: Java 8 or higher
+       ```
+    
+    2. **Missing dependencies**
+       - Check console for "NoClassDefFoundError"
+       - Verify required plugins are installed
+    
+    3. **Corrupted JAR file**
+       - Re-download plugin
+       - Verify file integrity
+       - Check file size matches download page
+    
+    **Solution steps**:
+    ```bash
+    1. Stop server
+    2. Check console log for specific error
+    3. Verify dependencies (see below)
+    4. Re-download plugin if needed
+    5. Start server and check console
+    ```
+  </Accordion>
+
+  <Accordion title="Plugin loads but features don't work">
+    **Check initialization messages**:
+    ```
+    [Debentialc] Plugin successfully enabled
+    [Debentialc] Version: 1.1.5
+    [Boosters] PlaceholderAPI expansion registered
+    [Raids] Sistema de raids inicializado
+    ```
+    
+    **Missing messages indicate failed initialization**:
+    - No booster message = PlaceholderAPI issue
+    - No raids message = CustomNPCs issue
+    - No claims message = Vault issue (if economy enabled)
+  </Accordion>
+</AccordionGroup>
+
+## Dependency Issues
+
+### PlaceholderAPI
+
+<AccordionGroup>
+  <Accordion title="PlaceholderAPI not detected">
+    **Error message**:
+    ```
+    [Boosters] PlaceholderAPI not found - placeholder expansion disabled
+    ```
+    
+    **Solution**:
+    1. Download PlaceholderAPI from [SpigotMC](https://www.spigotmc.org/resources/placeholderapi.6245/)
+    2. Install to `plugins/` folder
+    3. Restart server (reload may not work)
+    4. Verify: `/papi list` shows `boosters` and `debentialc`
+    
+    **Test placeholders**:
+    ```bash
+    /papi parse me %boosters_global_active%
+    /papi parse me %debentialc_level%
+    ```
+  </Accordion>
+
+  <Accordion title="Placeholders not updating">
+    **Symptoms**:
+    - Placeholder shows old value
+    - Booster changes don't reflect in placeholders
+    - Time doesn't count down
+    
+    **Causes**:
+    1. **Cached values** - Some plugins cache placeholder results
+    2. **Update interval** - Check your scoreboard/hologram update interval
+    3. **Plugin conflict** - Another placeholder plugin interfering
+    
+    **Solution**:
+    ```yaml
+    # In your scoreboard config (e.g., FeatherBoard)
+    interval: 20  # Update every second (20 ticks)
+    
+    # Force clear cache
+    /papi reload
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### CustomNPCs / DBC
+
+<AccordionGroup>
+  <Accordion title="CustomNPCs not detected">
+    **Warning message**:
+    ```
+    [Raids] CustomNPCs no está disponible. NPCDeathListener no será registrado.
+    [Raids] Asegúrate de que CustomNPCs esté instalado.
+    ```
+    
+    **Impact**:
+    - Raid NPC death detection won't work
+    - DBC-related placeholders return `0`
+    - TP commands may not function
+    
+    **Solution**:
+    1. Install CustomNPCs mod on client and server
+    2. Verify mod loads before Debentialc
+    3. Check for API availability: `noppes.npcs.api.AbstractNpcAPI.IsAvailable()`
+    
+    **Source**: `Main.java:107-129`
+  </Accordion>
+
+  <Accordion title="NPC death not detected in raids">
+    **Problem**: Killing NPCs doesn't progress raid waves
+    
+    **Check**:
+    1. NPCs must be spawned via CustomNPCs scripting
+    2. NPCs must have correct tags/names matching raid config
+    3. Death event must fire properly
+    
+    **Debug**:
+    ```java
+    // Check console for:
+    [Raids] NPC Muerte detectada: <NPC Name>
+    [Raids] NPC pertenece a wave activa
+    ```
+    
+    **Common issues**:
+    - NPC spawned incorrectly
+    - Wrong NPC type (not CustomNPCs entity)
+    - Raid session not active
+  </Accordion>
+</AccordionGroup>
+
+### Vault Economy
+
+<AccordionGroup>
+  <Accordion title="Vault not working with claims">
+    **Symptoms**:
+    - Can't purchase terrains
+    - No economy integration
+    - Price commands fail
+    
+    **Requirements**:
+    1. Vault plugin installed
+    2. Economy plugin (EssentialsX, CMI, etc.) installed
+    3. Vault hooked into economy plugin
+    
+    **Verification**:
+    ```bash
+    /vault-info
+    # Should show economy plugin detected
+    ```
+    
+    **Source**: `TerrainCommand.java:336-338`
+  </Accordion>
+</AccordionGroup>
+
+## Feature-Specific Issues
+
+### Booster System
+
+<AccordionGroup>
+  <Accordion title="Global booster not activating">
+    **Problem**: `/booster global activate 50% 1h` fails
+    
+    **Check**:
+    1. **Permission**: `debentialc.command.booster`
+    2. **Format**: Must be `<percentage>%` or just `<number>`
+    3. **Time format**: `1h`, `30m`, `2h30m`, etc.
+    
+    **Valid examples**:
+    ```bash
+    /booster global activate 50%      # 50% bonus
+    /booster global activate 150% 1h  # 150% for 1 hour
+    /booster global activate 2.5 2h   # 2.5x multiplier for 2 hours
+    ```
+    
+    **Invalid examples**:
+    ```bash
+    /booster global activate 50       # Missing % or wrong format
+    /booster global activate 50% 1    # Missing time unit
+    ```
+    
+    **Source**: `BoosterCommand.java:78-124`
+  </Accordion>
+
+  <Accordion title="Personal boosters not working">
+    **Problem**: Can't activate personal booster
+    
+    **Check**:
+    1. Player has boosters: `/booster personal list`
+    2. No active booster already (only 1 at a time)
+    3. Correct index: `/booster personal activate 0`
+    
+    **Debug**:
+    ```bash
+    # View available boosters
+    /booster personal list
+    
+    # Shows:
+    # [0] Legendary - +250% (Available)
+    # [1] Epic - +120% (Available)
+    
+    # Activate index 0
+    /booster personal activate 0
+    ```
+    
+    **Source**: `BoosterCommand.java:212-259`
+  </Accordion>
+
+  <Accordion title="Booster time not counting down">
+    **Problem**: Booster time stays the same
+    
+    **Cause**: Task scheduler not running
+    
+    **Check console for**:
+    ```
+    [Boosters] Task scheduler started
+    [Boosters] Checking global booster expiration
+    ```
+    
+    **Solution**:
+    ```bash
+    # Check tasks
+    /timings paste
+    
+    # Look for BoosterTaskScheduler
+    ```
+    
+    If not found:
+    1. Restart server
+    2. Check for plugin conflicts
+    3. Verify server TPS is stable
+  </Accordion>
+
+  <Accordion title="Boosters not persisting after restart">
+    **Problem**: Boosters disappear after server restart
+    
+    **Solutions**:
+    
+    1. **Verify auto-save**:
+       ```bash
+       # Check console on shutdown:
+       [Boosters] Saving all data...
+       [Boosters] Global booster saved
+       [Boosters] Personal boosters saved
+       ```
+    
+    2. **Manual save before restart**:
+       ```bash
+       /booster save
+       ```
+    
+    3. **Check file permissions**:
+       ```bash
+       ls -la plugins/Debentialc/data/boosters/
+       # Should be writable by server user
+       ```
+    
+    4. **Verify files exist**:
+       ```bash
+       cat plugins/Debentialc/data/boosters/global.json
+       ```
+    
+    **Source**: `BoosterStorage.java:89-109`
+  </Accordion>
+</AccordionGroup>
+
+### Raids System
+
+<AccordionGroup>
+  <Accordion title="Can't start raid">
+    **Common errors and solutions**:
+    
+    | Error | Cause | Solution |
+    |-------|-------|----------|
+    | "Raid no encontrada" | Invalid raid name | Use `/raid list` to see valid names |
+    | "La raid no está configurada" | Missing spawn points or waves | Configure in `/raid menu` |
+    | "Se necesitan al menos 2 jugadores" | Party too small | Invite more players |
+    | "Cooldown activo" | Player on cooldown | Wait or reset cooldown |
+    | "Otra party ya está haciendo esta raid" | Raid in progress | Wait for completion |
+    
+    **Source**: `PartyCommand.java:280-385`
+  </Accordion>
+
+  <Accordion title="NPCs not spawning">
+    **Problem**: Wave starts but no NPCs appear
+    
+    **Checklist**:
+    1. ✓ CustomNPCs installed and loaded
+    2. ✓ Spawn points configured in raid setup
+    3. ✓ NPC names match CustomNPCs available NPCs
+    4. ✓ World exists and is loaded
+    
+    **Debug console messages**:
+    ```
+    [Raids] Spawning wave NPCs for wave_0
+    [Raids] Spawn point 1: 3 NPCs spawned
+    [Raids] Wave activation successful
+    ```
+    
+    **If missing**:
+    - Check spawn point locations are valid
+    - Verify NPC exists in CustomNPCs
+    - Check chunk is loaded
+  </Accordion>
+
+  <Accordion title="Raid session stuck">
+    **Problem**: Raid won't end, party stuck in raid
+    
+    **Manual cleanup**:
+    ```bash
+    /raid reload  # Reloads and clears sessions
+    ```
+    
+    **Or restart server** (sessions don't persist)
+    
+    **Prevention**:
+    - Don't use `/kill` on raid NPCs
+    - Don't teleport party members out during raid
+    - Let raids complete naturally
+  </Accordion>
+
+  <Accordion title="Cooldown not working">
+    **Problem**: Can spam raids without cooldown
+    
+    **Verify cooldown config**:
+    ```bash
+    # Check raid settings in menu
+    /raid menu
+    # Navigate to raid > Settings > Cooldown
+    ```
+    
+    **Manual cooldown check**:
+    ```bash
+    # Console command to verify
+    # (requires debug mode or checking storage)
+    cat plugins/Debentialc/data/raids/cooldowns.json
+    ```
+    
+    **Source**: `PartyCommand.java:312-325`
+  </Accordion>
+</AccordionGroup>
+
+### Claims/Terrain System
+
+<AccordionGroup>
+  <Accordion title="Can't create terrain">
+    **Error**: "Ya existe un terreno con la id"
+    
+    **Solution**: Use unique terrain ID
+    ```bash
+    /terrain create unique_name 4
+    ```
+    
+    **Check existing terrains**:
+    ```bash
+    /terrain list
+    ```
+  </Accordion>
+
+  <Accordion title="Terrain collision on commit">
+    **Error**: "Se choca con el terreno X o está a menos de N bloques"
+    
+    **Cause**: Too close to another terrain
+    
+    **Solution**:
+    1. Move to different location
+    2. Check buffer setting (default: 16 blocks)
+    3. Delete colliding terrain if unwanted
+    
+    **Source**: `TerrainCommand.java:149-155`
+  </Accordion>
+
+  <Accordion title="Protection not working">
+    **Problem**: Non-members can break blocks in terrain
+    
+    **Check**:
+    1. Terrain is committed: `/terrain info`
+    2. Protection listener is loaded
+    3. No admin bypass permission: `claims.admin.bypass`
+    
+    **Verify protection**:
+    ```bash
+    # As non-member, try to break block in terrain
+    # Should see: "No tienes permiso en este terreno"
+    ```
+  </Accordion>
+
+  <Accordion title="Can't customize terrain">
+    **Problem**: Customization menu doesn't work
+    
+    **Requirements**:
+    1. Must be terrain owner or have `claims.admin.manage`
+    2. Terrain must be committed
+    3. Need specific customize permissions (see [Permissions](/advanced/permissions))
+    
+    **Permission structure**:
+    ```yaml
+    claims.command.terrain.customize         # Base permission
+    claims.command.terrain.customize.biome   # Change biome
+    claims.command.terrain.customize.weather # Control weather
+    # etc.
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance Issues
+
+<AccordionGroup>
+  <Accordion title="Server lag with boosters">
+    **Symptoms**: TPS drops when boosters active
+    
+    **Unlikely causes**: Booster system is lightweight
+    
+    **Check**:
+    1. Other plugins hooking into booster calculations
+    2. Excessive placeholder updates (reduce update rate)
+    3. Too many personal boosters loaded simultaneously
+    
+    **Optimization**:
+    ```yaml
+    # In scoreboard config
+    interval: 40  # Update every 2 seconds instead of every second
+    ```
+  </Accordion>
+
+  <Accordion title="Storage lag">
+    **Problem**: Server stutters on save operations
+    
+    **Solutions**:
+    1. **Reduce save frequency** (if custom saves implemented)
+    2. **Check disk I/O** with `iotop` or Task Manager
+    3. **Use SSD** instead of HDD for world/plugin storage
+    
+    **Monitor**:
+    ```bash
+    /timings paste
+    # Look for BoosterStorage or RaidStorageManager time usage
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Console Errors
+
+### Common Error Messages
+
+<AccordionGroup>
+  <Accordion title="JsonSyntaxException">
+    ```
+    com.google.gson.JsonSyntaxException: Expected BEGIN_OBJECT but was STRING
+    ```
+    
+    **Cause**: Corrupted JSON data file
+    
+    **Solution**:
+    1. Locate problematic file (shown in error stack trace)
+    2. Validate JSON at jsonlint.com
+    3. Fix syntax or restore from backup
+    4. Delete file to regenerate (data loss)
+  </Accordion>
+
+  <Accordion title="NullPointerException in BoosterManager">
+    ```
+    NullPointerException at PersonalBoosterManager.getActiveBooster
+    ```
+    
+    **Cause**: Player data not loaded
+    
+    **Usually auto-recovers**. If persistent:
+    ```bash
+    # Delete player's booster data
+    rm plugins/Debentialc/data/boosters/personal/<uuid>/boosters.json
+    ```
+  </Accordion>
+
+  <Accordion title="IllegalArgumentException in time parsing">
+    ```
+    IllegalArgumentException: Invalid time format
+    ```
+    
+    **Cause**: Wrong time format in command
+    
+    **Valid formats**:
+    - `1d` (1 day)
+    - `2h` (2 hours)
+    - `30m` (30 minutes)
+    - `45s` (45 seconds)
+    - `1h30m` (1 hour 30 minutes)
+    - `2d12h` (2 days 12 hours)
+    
+    **Invalid**:
+    - `1 hour` (use `1h`)
+    - `90` (missing unit)
+    - `1.5h` (no decimals, use `1h30m`)
+  </Accordion>
+</AccordionGroup>
+
+## Getting Help
+
+### Before Asking for Support
+
+1. **Check this troubleshooting guide**
+2. **Review relevant documentation pages**
+3. **Check console for errors**
+4. **Test with minimal plugin setup**
+5. **Verify all dependencies are installed**
+
+### Information to Provide
+
+```yaml
+# Include in support request:
+- Server version: /version
+- Plugin version: /version Debentialc
+- Java version: java -version
+- Other plugins: /plugins
+- Full error from console (use pastebin.com)
+- Steps to reproduce issue
+- Config files if relevant
+```
+
+### Debug Mode
+
+Enable detailed logging:
+
+```yaml
+# config.yml (if available)
+debug: true
+```
+
+Restart and reproduce issue, then share console output.
+
+## See Also
+
+- [Configuration Guide](/configuration) - Configure plugin settings
+- [Permissions](/advanced/permissions) - Fix permission issues  
+- [Storage](/advanced/storage) - Understand data persistence
+- [FAQ](/advanced/faq) - Frequently asked questions

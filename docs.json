@@ -1,122 +1,110 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Debentialc",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#2ECC40",
+    "light": "#7FDBFF",
+    "dark": "#0074D9"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/TheFive40/Debentialc"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/TheFive40/Debentialc"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "configuration",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Systems",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "systems/boosters",
+              "systems/custom-items",
+              "systems/raids",
+              "systems/claims"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "guides/boosters-setup",
+              "guides/creating-custom-items",
+              "guides/raid-configuration",
+              "guides/territory-management"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Commands",
             "pages": [
-              "api-reference/introduction"
+              "api/commands/booster",
+              "api/commands/customitem",
+              "api/commands/raid",
+              "api/commands/terrain",
+              "api/commands/lease"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Managers & Core",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/managers/booster-manager",
+              "api/managers/raid-manager",
+              "api/managers/terrain-manager",
+              "api/integration/placeholders"
+            ]
+          },
+          {
+            "group": "Models & Events",
+            "pages": [
+              "api/models/boosters",
+              "api/models/custom-items",
+              "api/models/raids",
+              "api/events/overview"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Advanced",
+        "groups": [
+          {
+            "group": "Configuration",
+            "pages": [
+              "advanced/permissions",
+              "advanced/placeholders",
+              "advanced/storage"
+            ]
+          },
+          {
+            "group": "Support",
+            "pages": [
+              "advanced/troubleshooting",
+              "advanced/faq"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

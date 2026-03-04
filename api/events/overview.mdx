@@ -1,0 +1,516 @@
+---
+title: Event System Overview
+description: Overview of the Bukkit event listeners used throughout the Debentialc plugin
+---
+
+The Debentialc plugin uses Bukkit's event system to respond to player actions, game events, and custom triggers. The plugin is organized into several modules, each with its own set of event listeners.
+
+## Architecture
+
+All event listeners in the plugin implement Bukkit's `Listener` interface and use the `@EventHandler` annotation to register event handling methods. Events are automatically registered when the plugin loads.
+
+### Event Priority
+
+Listeners use different event priorities to control execution order:
+
+- `EventPriority.NORMAL` - Standard priority for most listeners
+- `EventPriority.HIGH` - For listeners that need to run after normal handlers
+- `EventPriority.MONITOR` - For read-only monitoring (not used for canceling)
+
+## Event Modules
+
+### Booster Events
+
+Handles booster activation, persistence, and lifecycle management.
+
+<Card title="BoosterListener" icon="zap" href="#boosterlistener">
+  Manages personal booster loading/saving and player join/quit events
+</Card>
+
+**Package:** `org.debentialc.boosters.events`
+
+**Key Events:**
+- `PlayerJoinEvent` - Loads personal boosters from storage
+- `PlayerQuitEvent` - Saves active boosters and cleans up expired ones
+
+**Example:**
+```java
+@EventHandler(priority = EventPriority.NORMAL)
+public void onPlayerJoin(PlayerJoinEvent event) {
+    Player player = event.getPlayer();
+    List<PersonalBooster> boosters = BoosterStorage.loadPersonalBoosters(player.getUniqueId());
+    
+    for (PersonalBooster booster : boosters) {
+        PersonalBoosterManager.addBooster(booster);
+    }
+}
+```
+
+**Source:** `BoosterListener.java:20`
+
+---
+
+### Custom Items Events
+
+Handles interactions with custom items, including usage, creation, and scripting.
+
+<CardGroup cols={2}>
+  <Card title="ConsumableItemListener" icon="flask" href="#consumableitemlistener">
+    Processes consumable items, commands, and TP rewards
+  </Card>
+  <Card title="ScriptExecutionListener" icon="code" href="#scriptexecutionlistener">
+    Executes JavaScript scripts attached to custom items
+  </Card>
+  <Card title="CustomDurabilityListener" icon="wrench" href="#customdurabilitylistener">
+    Manages custom durability for items
+  </Card>
+  <Card title="ArmorEquipEvent" icon="shield" href="#armorequipevent">
+    Custom event fired when armor is equipped
+  </Card>
+</CardGroup>
+
+**Package:** `org.debentialc.customitems.events`
+
+#### ConsumableItemListener
+
+Handles right-click interactions with custom items that have consumable properties, commands, or TP values.
+
+**Key Events:**
+- `PlayerInteractEvent` - Processes item usage
+
+**Features:**
+- Executes console commands with placeholder support (`@dp` for user, `@p` for target)
+- Grants Training Points (TP) to players
+- Handles stack consumption
+- Supports target detection (looks at player)
+
+**Command Placeholders:**
+- `@dp` - The player using the item
+- `@p` - The player being looked at (or self if none)
+
+**Example:**
+```java
+@EventHandler
+public void onItemUse(PlayerInteractEvent event) {
+    ItemStack item = event.getPlayer().getItemInHand();
+    CustomItem customItem = itemCmd.toItemCustom(item);
+    
+    if (customItem != null && customItem.isConsumable()) {
+        // Execute commands
+        if (customItem.getCommands() != null) {
+            executeCommands(player, customItem.getCommands());
+        }
+        
+        // Grant TP
+        if (customItem.getTpValue() > 0) {
+            giveTP(player, customItem.getTpValue(), amount);
+        }
+        
+        // Consume item
+        item.setAmount(item.getAmount() - 1);
+    }
+}
+```
+
+**Source:** `ConsumableItemListener.java:24`
+
+#### ScriptExecutionListener
+
+Executes JavaScript scripts associated with custom items when they are used.
+
+**Key Events:**
+- `PlayerInteractEvent` (HIGH priority) - Detects item usage and executes scripts
+
+**Features:**
+- Creates script execution context with player, item, location, and world data
+- Integrates with ScriptManager for script execution
+- Supports event type identification
+
+**Script Context:**
+```java
+ScriptContext context = new ScriptContext(player)
+    .setItem(item)
+    .setLocation(player.getLocation())
+    .setWorld(player.getWorld())
+    .setEventType("use");
+
+ScriptManager.getInstance().executeScript(itemId, context);
+```
+
+**Source:** `ScriptExecutionListener.java:20`
+
+#### ArmorEquipEvent
+
+Custom event that fires when a player equips or unequips armor pieces.
+
+**Event Properties:**
+- `player` (Player) - The player equipping armor
+- `newItem` (ItemStack) - The armor piece being equipped
+- `cancelled` (boolean) - Whether the event is cancelled
+
+**Usage:**
+```java
+@EventHandler
+public void onArmorEquip(ArmorEquipEvent event) {
+    Player player = event.getPlayer();
+    ItemStack armor = event.getNewItem();
+    
+    // Check if it's a custom armor piece
+    if (isCustomArmor(armor)) {
+        // Apply stat bonuses
+        applyArmorStats(player, armor);
+    }
+}
+```
+
+**Source:** `ArmorEquipEvent.java:10`
+
+---
+
+### Raid Events
+
+Manages raid progression, NPC spawning, combat, and player participation.
+
+<CardGroup cols={2}>
+  <Card title="NPCDeathListener" icon="skull" href="#npcdeathlistener">
+    Handles NPC deaths and wave progression
+  </Card>
+  <Card title="PlayerDeathListener" icon="heart-crack" href="#playerdeathlistener">
+    Manages player deaths in raids
+  </Card>
+  <Card title="PlayerQuitListener" icon="door-open" href="#playerquitlistener">
+    Handles players leaving during raids
+  </Card>
+</CardGroup>
+
+**Package:** `org.debentialc.raids.events`
+
+#### NPCDeathListener
+
+The primary event handler for raid progression. Tracks NPC deaths, manages wave completion, and handles rewards.
+
+**Key Events:**
+- `INpcEvent.DiedEvent` (CustomNPCs API) - Fired when an NPC dies
+
+**Features:**
+- Tracks killed NPCs per wave
+- Updates wave progress in real-time
+- Manages wave countdown timers
+- Handles wave completion and rewards
+- Manages raid completion and victory
+- Provides player feedback (messages, sounds, effects)
+
+**Wave Progression Flow:**
+
+<Steps>
+  <Step title="NPC Death Detected">
+    Event fires when an NPC is killed by a player
+  </Step>
+  <Step title="Update Progress">
+    Remaining enemy count is updated and displayed to players
+  </Step>
+  <Step title="Wave Completion">
+    When all enemies are dead, rewards are executed
+  </Step>
+  <Step title="Countdown">
+    10-second countdown begins before next wave
+  </Step>
+  <Step title="Next Wave or Victory">
+    Either spawn the next wave or complete the raid
+  </Step>
+</Steps>
+
+**Key Methods:**
+
+```java
+private void handleNpcDeath(int entityId, String waveId, RaidSession session, Player killer)
+```
+Processes an NPC death and updates wave state.
+
+**Source:** `NPCDeathListener.java:62`
+
+```java
+private void completeWave(RaidSession session, String waveId)
+```
+Handles wave completion, rewards distribution, and countdown initiation.
+
+**Source:** `NPCDeathListener.java:99`
+
+```java
+private void startWaveCountdown(RaidSession session, String previousWaveId)
+```
+Starts a 10-second countdown with visual and audio feedback before the next wave.
+
+**Source:** `NPCDeathListener.java:160`
+
+```java
+private void completeRaidWithEffects(RaidSession session)
+```
+Handles successful raid completion with victory effects and final rewards.
+
+**Source:** `NPCDeathListener.java:256`
+
+```java
+private void updateWaveProgress(RaidSession session, int enemiesRemaining)
+```
+Sends progress updates to players with visual progress bars.
+
+**Source:** `NPCDeathListener.java:298`
+
+```java
+private void executeWaveRewardsOnce(RaidSession session)
+```
+Executes reward commands for all active players, ensuring rewards are only given once.
+
+**Source:** `NPCDeathListener.java:333`
+
+**Progress Messages:**
+
+Players receive real-time updates:
+- Kill confirmation: `§e⚔ §f+1 enemigo §7(5 restantes)`
+- Progress bar: `§6Oleada 2/5 §8| §7Enemigos: §a████§7████ §f4/8`
+- Low enemy warning: `§c⚠ §f¡Solo quedan §c3 §fenemigos!`
+
+**Wave Completion Messages:**
+
+```
+§8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+§a§l  ✓ OLEADA 2/5 COMPLETADA ✓
+
+§7  Progreso: §e[§a██§7███§e] §f40%
+§8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+```
+
+**Victory Messages:**
+
+```
+§8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+§6§l         🏆 ¡RAID COMPLETADA! 🏆
+
+§e  Raid: §fDragon's Lair
+§e  Oleadas: §a5/5 §fcompletadas §l✓
+§e  Tiempo: §f12m 34s
+§e  Jugadores: §f3 sobrevivientes
+
+§a  ✓ Todas las recompensas han sido otorgadas
+§7  Regresando al spawn...
+§8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+```
+
+**Source:** `NPCDeathListener.java:21`
+
+#### PlayerDeathListener
+
+Handles player deaths during active raids.
+
+**Key Events:**
+- `PlayerDeathEvent` - Removes player from active raid session
+
+**Features:**
+- Marks players as dead in the session
+- Checks for raid failure (all players dead)
+- Prevents respawning in raid arena
+
+**Source:** Located in `org.debentialc.raids.events`
+
+#### PlayerQuitListener
+
+Handles players disconnecting during raids.
+
+**Key Events:**
+- `PlayerQuitEvent` - Marks player as having left the raid
+
+**Features:**
+- Tracks players who quit mid-raid
+- Allows rejoining if conditions are met
+- Checks for raid failure if too many players quit
+
+**Source:** Located in `org.debentialc.raids.events`
+
+---
+
+### Claims Events
+
+Handles terrain protection, lease management, and territory systems.
+
+**Package:** `org.debentialc.claims.events`
+
+**Listeners:**
+- `TerrainProtectionListener` - Prevents unauthorized block/entity interactions
+- `LeaseProtectionListener` - Manages lease-based access control
+- `TerrainSignListener` - Handles terrain info signs
+- `PlayerDeathInTerrain` - Special death handling in protected areas
+
+---
+
+## Creating Custom Event Listeners
+
+To create your own event listener that integrates with the Debentialc plugin:
+
+### Step 1: Implement Listener Interface
+
+```java
+import org.bukkit.event.Listener;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.player.PlayerInteractEvent;
+
+public class MyCustomListener implements Listener {
+    
+    @EventHandler
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        // Your event handling logic
+    }
+}
+```
+
+### Step 2: Register the Listener
+
+In your main plugin class or module:
+
+```java
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.java.JavaPlugin;
+
+public class MyPlugin extends JavaPlugin {
+    
+    @Override
+    public void onEnable() {
+        // Register listeners
+        Bukkit.getPluginManager().registerEvents(new MyCustomListener(), this);
+    }
+}
+```
+
+### Step 3: Use Event Priority
+
+```java
+@EventHandler(priority = EventPriority.HIGH)
+public void onHighPriorityEvent(PlayerInteractEvent event) {
+    // Runs after NORMAL priority handlers
+}
+
+@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+public void onMonitorEvent(PlayerInteractEvent event) {
+    // For read-only monitoring, doesn't modify event
+}
+```
+
+---
+
+## Best Practices
+
+<Tip>
+**Performance:** Avoid heavy operations in event handlers. Use async tasks or schedulers for expensive operations.
+</Tip>
+
+<Tip>
+**Error Handling:** Always use try-catch blocks to prevent one event failure from breaking others.
+</Tip>
+
+<Warning>
+**Event Cancellation:** Be careful when cancelling events, as it may affect other plugins or listeners.
+</Warning>
+
+### Example: Async Processing
+
+```java
+@EventHandler
+public void onExpensiveEvent(PlayerInteractEvent event) {
+    Player player = event.getPlayer();
+    
+    // Run expensive operation async
+    Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        // Heavy database query or calculation
+        String result = performExpensiveOperation();
+        
+        // Return to main thread for game interaction
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            player.sendMessage(result);
+        });
+    });
+}
+```
+
+### Example: Safe Event Handling
+
+```java
+@EventHandler
+public void onPlayerEvent(PlayerInteractEvent event) {
+    try {
+        Player player = event.getPlayer();
+        ItemStack item = player.getItemInHand();
+        
+        if (item == null || item.getTypeId() == 0) {
+            return;
+        }
+        
+        // Your logic here
+        
+    } catch (Exception e) {
+        plugin.getLogger().severe("Error handling player event: " + e.getMessage());
+        e.printStackTrace();
+    }
+}
+```
+
+---
+
+## Event Flow Examples
+
+### Custom Item Usage Flow
+
+<Steps>
+  <Step title="Player Right-Clicks">
+    PlayerInteractEvent fires
+  </Step>
+  <Step title="Script Check">
+    ScriptExecutionListener checks for scripts (HIGH priority)
+  </Step>
+  <Step title="Consumable Check">
+    ConsumableItemListener processes consumables (NORMAL priority)
+  </Step>
+  <Step title="Command Execution">
+    Commands are executed with placeholder replacement
+  </Step>
+  <Step title="TP Grant">
+    Training Points are awarded if configured
+  </Step>
+  <Step title="Item Consumption">
+    Item stack is reduced or removed
+  </Step>
+</Steps>
+
+### Raid Combat Flow
+
+<Steps>
+  <Step title="Player Attacks NPC">
+    Normal Bukkit combat occurs
+  </Step>
+  <Step title="NPC Dies">
+    INpcEvent.DiedEvent fires
+  </Step>
+  <Step title="NPCDeathListener">
+    Tracks death and updates wave progress
+  </Step>
+  <Step title="Progress Update">
+    Players receive visual feedback
+  </Step>
+  <Step title="Wave Check">
+    If all enemies dead, wave completes
+  </Step>
+  <Step title="Rewards">
+    Wave rewards are distributed
+  </Step>
+  <Step title="Next Wave or Victory">
+    Countdown starts or raid completes
+  </Step>
+</Steps>
+
+---
+
+## Related Resources
+
+- [Booster Models](/api/models/boosters) - Data models for the booster system
+- [CustomItem Model](/api/models/custom-items) - Custom item configuration
+- [Raid Models](/api/models/raids) - Raid system data structures
+- [Bukkit Event API](https://hub.spigotmc.org/javadocs/bukkit/org/bukkit/event/Event.html) - Official Bukkit documentation

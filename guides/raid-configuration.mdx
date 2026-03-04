@@ -1,0 +1,639 @@
+---
+title: 'Raid Configuration Guide'
+description: 'Set up and manage custom raids with NPC waves, rewards, and party systems'
+---
+
+The Debentialc raid system allows you to create instanced PvE challenges with multiple waves of CustomNPCs enemies. This guide covers raid creation, wave configuration, party management, and integration with CustomNPCs.
+
+## Overview
+
+Raids in Debentialc are:
+- **Instanced challenges** with configurable difficulty
+- **Multi-wave encounters** with CustomNPCs integration
+- **Party-based** supporting 1-5 players
+- **Cooldown-managed** to prevent farming
+- **Fully persistent** with JSON storage
+
+<Warning>
+  Raids require the **CustomNPCs** plugin to be installed and properly configured. NPCs must be created in CustomNPCs before adding them to raids.
+</Warning>
+
+## Initial Setup
+
+### Prerequisites
+
+<Steps>
+  <Step title="Install CustomNPCs">
+    Download and install CustomNPCs mod/plugin on your server.
+  </Step>
+  
+  <Step title="Verify integration">
+    Check that Debentialc recognizes CustomNPCs:
+    
+    ```java Main.java:105-129
+    private void registerCustomNPCsEvents() {
+        getServer().getScheduler().runTaskLater(this, () -> {
+            if (!noppes.npcs.api.AbstractNpcAPI.IsAvailable()) {
+                getLogger().warning("[Raids] CustomNPCs no está disponible. NPCDeathListener no será registrado.");
+                getLogger().warning("[Raids] Asegúrate de que CustomNPCs esté instalado.");
+                return;
+            }
+
+            try {
+                noppes.npcs.api.AbstractNpcAPI api = noppes.npcs.api.AbstractNpcAPI.Instance();
+
+                if (api == null) {
+                    getLogger().severe("[Raids] No se pudo obtener la instancia de la API de CustomNPCs!");
+                    return;
+                }
+
+                api.events().register(new org.debentialc.raids.events.NPCDeathListener());
+
+                getLogger().info("[Raids] NPCDeathListener registrado correctamente en CustomNPCs");
+
+            } catch (Exception e) {
+                getLogger().severe("[Raids] Error al registrar NPCDeathListener:");
+                e.printStackTrace();
+            }
+        }, 20L);
+    }
+    ```
+    
+    Check console for: `[Raids] NPCDeathListener registrado correctamente en CustomNPCs`
+  </Step>
+  
+  <Step title="Load raid system">
+    The raid system initializes automatically:
+    
+    ```java Main.java:80-81
+    RaidStorageManager.loadAllRaids();
+    System.out.println("[Raids] Sistema de raids inicializado");
+    ```
+  </Step>
+</Steps>
+
+## Creating a Raid
+
+### Using Commands
+
+<Steps>
+  <Step title="Open raid menu">
+    ```bash
+    /raid
+    # Or
+    /raid menu
+    ```
+    
+    This opens a visual menu interface for managing raids.
+  </Step>
+  
+  <Step title="Create new raid">
+    ```bash
+    /raid create
+    ```
+    
+    You'll be prompted to enter:
+    - Raid ID (unique identifier)
+    - Raid display name
+    - Description
+  </Step>
+  
+  <Step title="Configure spawn points">
+    In the raid menu:
+    - Set **Player Spawn Point** - Where players teleport when raid starts
+    - Set **Arena Spawn Point** - Where NPCs spawn during waves (optional)
+  </Step>
+  
+  <Step title="Configure raid settings">
+    - **Min Players**: Minimum party size (default: 1)
+    - **Max Players**: Maximum party size (default: 5)
+    - **Cooldown**: Time between raids in seconds (default: 3600)
+    - **Enabled**: Whether the raid is accessible
+  </Step>
+</Steps>
+
+### Raid Model Structure
+
+From the source code:
+
+```java Raid.java:15-94
+@Getter
+@Setter
+public class Raid {
+
+    @Expose
+    private String raidId;
+
+    @Expose
+    private String raidName;
+
+    @Expose
+    private String description;
+
+    @Expose
+    private Location arenaSpawnPoint;
+
+    @Expose
+    private Location playerSpawnPoint;
+
+    @Expose
+    private List<Wave> waves;
+
+    @Expose
+    private RaidStatus status;
+
+    @Expose
+    private long cooldownSeconds;
+
+    @Expose
+    private int minPlayers;
+
+    @Expose
+    private int maxPlayers;
+
+    @Expose
+    private boolean enabled;
+
+    @Expose
+    private long createdAt;
+
+    @Expose
+    private String createdBy;
+
+    public Raid(String raidId, String raidName) {
+        this.raidId = raidId;
+        this.raidName = raidName;
+        this.waves = new ArrayList<>();
+        this.status = RaidStatus.IDLE;
+        this.minPlayers = 1; // Solo raids allowed
+        this.maxPlayers = 5;
+        this.cooldownSeconds = 3600;
+        this.enabled = true;
+        this.createdAt = System.currentTimeMillis();
+    }
+
+    public Wave getWaveByIndex(int index) {
+        if (index >= 0 && index < waves.size()) {
+            return waves.get(index);
+        }
+        return null;
+    }
+
+    public void addWave(Wave wave) {
+        waves.add(wave);
+    }
+
+    public int getTotalWaves() {
+        return waves.size();
+    }
+
+    public boolean isConfigured() {
+        return
+                playerSpawnPoint != null &&
+                !waves.isEmpty();
+    }
+}
+```
+
+## Configuring Waves
+
+### Wave System
+
+Each raid consists of multiple waves. Each wave can have:
+- Multiple NPC spawns
+- Delay before starting
+- Specific spawn locations
+- Victory conditions
+
+### Adding Waves via Menu
+
+<Steps>
+  <Step title="Open raid editor">
+    Use `/raid menu` and select your raid to edit.
+  </Step>
+  
+  <Step title="Add wave">
+    Click "Add Wave" in the menu and configure:
+    - Wave number (sequential)
+    - Delay before wave starts (seconds)
+    - NPCs to spawn in this wave
+  </Step>
+  
+  <Step title="Add NPCs to wave">
+    For each NPC in the wave:
+    - NPC ID from CustomNPCs
+    - Spawn location (or use arena spawn point)
+    - Quantity to spawn
+  </Step>
+</Steps>
+
+### Wave Configuration Tips
+
+<Tip>
+  **Progressive Difficulty**: Start with fewer, weaker NPCs in early waves and increase quantity/strength in later waves.
+  
+  Example wave structure:
+  - Wave 1: 3 basic enemies
+  - Wave 2: 5 basic enemies + 1 elite
+  - Wave 3: 7 enemies + 2 elites
+  - Wave 4: 10 enemies + 1 boss
+</Tip>
+
+## Party System
+
+Raids are designed for party-based gameplay.
+
+### Creating a Party
+
+```bash
+# Party leader creates party
+/party create
+
+# Invite players
+/party invite <player>
+
+# Players accept
+/party accept <leader>
+
+# Check party status
+/party info
+```
+
+### Starting a Raid
+
+<Steps>
+  <Step title="Form party">
+    Ensure your party meets the raid requirements:
+    - Party size between minPlayers and maxPlayers
+    - All members online and in same world
+  </Step>
+  
+  <Step title="Party leader starts raid">
+    Only the party leader can start raids:
+    ```bash
+    /raid start <raid_id>
+    ```
+  </Step>
+  
+  <Step title="All members teleported">
+    All party members are teleported to the player spawn point and the first wave begins.
+  </Step>
+</Steps>
+
+### Party Management Commands
+
+<CodeGroup>
+```bash Create & Invite
+/party create
+/party invite <player>
+/party accept <leader>
+/party kick <player>
+```
+
+```bash Information
+/party info
+/party list
+/party members
+```
+
+```bash Control
+/party leave
+/party disband
+/party promote <player>
+```
+</CodeGroup>
+
+## Cooldown System
+
+Raids have cooldowns to prevent farming.
+
+### How Cooldowns Work
+
+1. **Per-player cooldowns** - Each player has individual cooldown for each raid
+2. **Starts on completion** - Cooldown begins when raid is completed (not started)
+3. **Persistent** - Cooldowns save across server restarts
+
+### Managing Cooldowns
+
+```bash
+# Check cooldown status
+/raid cooldown <raid_id>
+
+# Admin: Reset cooldown for player
+/raid resetcooldown <player> <raid_id>
+
+# Admin: Clear all cooldowns
+/raid clearallcooldowns
+```
+
+## Data Persistence
+
+### Storage System
+
+Raids are stored in JSON format:
+
+```java RaidStorageManager.java:26-28
+private static final String BASE_PATH = "plugins/Debentialc/data/raids";
+private static final String RAIDS_FILE = "raids.json";
+private static final String COOLDOWNS_FILE = "cooldowns.json";
+```
+
+### Saving and Loading
+
+<CodeGroup>
+```bash Manual Save
+/raid save
+```
+
+```bash Manual Load  
+/raid reload
+```
+
+```java Automatic Save
+// Raids auto-save on:
+// - Server shutdown
+// - Raid completion
+// - Configuration changes
+
+RaidStorageManager.saveAllRaids();
+RaidStorageManager.saveCooldowns();
+```
+</CodeGroup>
+
+### Backup System
+
+Create backups of raid data:
+
+```java RaidStorageManager.java:258-283
+public static void backupRaids() {
+    try {
+        Path source = Paths.get(BASE_PATH);
+        Path backup = Paths.get(BASE_PATH, "backup_" + System.currentTimeMillis());
+        Files.createDirectories(backup);
+        Files.walk(source)
+                .filter(p -> !p.equals(source))
+                .forEach(p -> {
+                    try {
+                        Path relative = source.relativize(p);
+                        Path target = backup.resolve(relative);
+                        if (Files.isDirectory(p)) {
+                            Files.createDirectories(target);
+                        } else {
+                            Files.copy(p, target);
+                        }
+                    } catch (IOException e) {
+                        System.err.println("[Raids] Error al hacer backup: " + e.getMessage());
+                    }
+                });
+        System.out.println("[Raids] Backup realizado: " + backup);
+    } catch (IOException e) {
+        System.err.println("[Raids] Error al realizar backup: " + e.getMessage());
+        e.printStackTrace();
+    }
+}
+```
+
+## NPC Integration
+
+### NPC Death Detection
+
+The system automatically detects when raid NPCs die:
+
+```java
+// NPCDeathListener is registered with CustomNPCs API
+// Tracks kills and progresses waves automatically
+```
+
+### Setting Up Raid NPCs
+
+<Steps>
+  <Step title="Create NPCs in CustomNPCs">
+    Use CustomNPCs tools to create your enemy NPCs:
+    - Set health, damage, abilities
+    - Configure AI behavior
+    - Set models and textures
+    - Note the NPC ID
+  </Step>
+  
+  <Step title="Add to raid wave">
+    In the Debentialc raid menu:
+    - Select the wave
+    - Add NPC spawn
+    - Enter the CustomNPCs ID
+    - Set quantity and spawn location
+  </Step>
+  
+  <Step title="Test the wave">
+    Start a test raid to verify:
+    - NPCs spawn correctly
+    - Kill detection works
+    - Wave progresses when all NPCs defeated
+  </Step>
+</Steps>
+
+<Warning>
+  NPCs must exist in CustomNPCs before being added to raids. Invalid NPC IDs will cause wave failures.
+</Warning>
+
+## Raid Commands Reference
+
+### Admin Commands
+
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/raid` | Open main menu | `dbcplugin.raids.admin` |
+| `/raid create` | Create new raid | `dbcplugin.raids.admin` |
+| `/raid list` | View all raids | `dbcplugin.raids.admin` |
+| `/raid menu` | Open visual menu | `dbcplugin.raids.admin` |
+| `/raid save` | Save all data | `dbcplugin.raids.admin` |
+| `/raid reload` | Reload from disk | `dbcplugin.raids.admin` |
+| `/raid info` | Show system info | `dbcplugin.raids.admin` |
+
+### Player Commands
+
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/party create` | Create party | Default |
+| `/party invite <player>` | Invite to party | Default |
+| `/party accept <leader>` | Join party | Default |
+| `/party leave` | Leave party | Default |
+| `/party info` | Party status | Default |
+| `/raid start <id>` | Start raid (leader only) | Default |
+
+## Advanced Configuration
+
+### Programmatic Raid Creation
+
+Create raids via API:
+
+```java
+import org.debentialc.raids.models.Raid;
+import org.debentialc.raids.models.Wave;
+import org.debentialc.raids.managers.RaidManager;
+import org.bukkit.Location;
+
+// Create raid
+Raid raid = new Raid("dragon_temple", "Dragon Temple Raid");
+raid.setDescription("Defeat the ancient dragon guardians");
+raid.setMinPlayers(3);
+raid.setMaxPlayers(5);
+raid.setCooldownSeconds(7200); // 2 hours
+
+// Set spawn points
+Location playerSpawn = new Location(world, 100, 64, 100);
+Location arenaSpawn = new Location(world, 120, 64, 120);
+raid.setPlayerSpawnPoint(playerSpawn);
+raid.setArenaSpawnPoint(arenaSpawn);
+
+// Add waves
+Wave wave1 = new Wave();
+wave1.addNpcSpawn("guardian_1", 3);
+wave1.setDelaySeconds(5);
+raid.addWave(wave1);
+
+Wave wave2 = new Wave();
+wave2.addNpcSpawn("guardian_2", 5);
+wave2.addNpcSpawn("elite_guardian", 1);
+wave2.setDelaySeconds(10);
+raid.addWave(wave2);
+
+// Register and save
+RaidManager.updateRaid(raid);
+RaidStorageManager.saveRaid(raid);
+```
+
+### Custom Raid Events
+
+Listen for raid events:
+
+```java
+@EventHandler
+public void onRaidStart(RaidStartEvent event) {
+    Raid raid = event.getRaid();
+    Party party = event.getParty();
+    
+    // Custom logic on raid start
+    Bukkit.broadcastMessage("Raid started: " + raid.getRaidName());
+}
+
+@EventHandler
+public void onRaidComplete(RaidCompleteEvent event) {
+    Raid raid = event.getRaid();
+    Party party = event.getParty();
+    
+    // Give rewards
+    for (Player member : party.getMembers()) {
+        giveRaidRewards(member, raid);
+    }
+}
+
+@EventHandler
+public void onWaveComplete(WaveCompleteEvent event) {
+    int waveNumber = event.getWaveNumber();
+    Raid raid = event.getRaid();
+    
+    // Bonus rewards for wave completion
+    broadcastToRaid("Wave " + waveNumber + " complete!");
+}
+```
+
+## Example Raid Setup
+
+Complete example of a 3-wave raid:
+
+<Steps>
+  <Step title="Create the raid">
+    ```bash
+    /raid create
+    # Enter ID: ancient_ruins
+    # Enter Name: Ancient Ruins
+    # Enter Description: Explore the cursed ruins
+    ```
+  </Step>
+  
+  <Step title="Configure settings">
+    In the raid menu:
+    - Min Players: 2
+    - Max Players: 4
+    - Cooldown: 3600 seconds (1 hour)
+    - Set player spawn point at entrance
+    - Set arena spawn at center of ruins
+  </Step>
+  
+  <Step title="Add Wave 1">
+    - 5x Skeleton Warriors (NPC ID: skeleton_warrior)
+    - Delay: 5 seconds
+    - Spawn at arena point
+  </Step>
+  
+  <Step title="Add Wave 2">
+    - 8x Skeleton Warriors
+    - 2x Skeleton Archers (NPC ID: skeleton_archer)
+    - Delay: 10 seconds
+  </Step>
+  
+  <Step title="Add Wave 3 (Boss)">
+    - 1x Ancient Lich (NPC ID: ancient_lich)
+    - 4x Skeleton Mages (NPC ID: skeleton_mage)
+    - Delay: 15 seconds
+  </Step>
+  
+  <Step title="Enable and test">
+    - Enable the raid
+    - Create a test party
+    - Run `/raid start ancient_ruins`
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="NPCs not spawning">
+  - Verify CustomNPCs is installed and loaded
+  - Check NPC IDs are correct in CustomNPCs
+  - Ensure spawn locations are valid
+  - Check console for errors: `[Raids] Error al registrar NPCDeathListener`
+</Accordion>
+
+<Accordion title="Wave not progressing">
+  - Verify all NPCs in wave are killed
+  - Check NPCDeathListener is registered (console message on startup)
+  - Ensure NPC IDs match between CustomNPCs and raid configuration
+</Accordion>
+
+<Accordion title="Party can't start raid">
+  - Check party size is within min/max players
+  - Verify raid is enabled
+  - Check cooldown hasn't expired for party members
+  - Ensure player spawn point is set
+</Accordion>
+
+<Accordion title="Data not saving">
+  - Check file permissions in `plugins/Debentialc/data/raids/`
+  - Use `/raid save` manually
+  - Check console for save errors
+  - Verify GSON serialization (check for circular references)
+</Accordion>
+
+## Best Practices
+
+<Steps>
+  <Step title="Test thoroughly">
+    Test each wave individually before enabling the raid for players.
+  </Step>
+  
+  <Step title="Balance rewards">
+    Ensure cooldowns and rewards match difficulty. Harder raids should have better rewards and longer cooldowns.
+  </Step>
+  
+  <Step title="Clear objectives">
+    Use raid descriptions to communicate requirements, difficulty, and recommended party size.
+  </Step>
+  
+  <Step title="Regular backups">
+    Use the backup system before making major changes to raid configurations.
+  </Step>
+  
+  <Step title="Monitor performance">
+    Large numbers of NPCs can impact server performance. Test with realistic player counts.
+  </Step>
+</Steps>

@@ -1,0 +1,815 @@
+---
+title: "Raids System"
+description: "Complete technical documentation for the Raids system - CustomNPC integration, wave management, party system, cooldowns, and session tracking"
+---
+
+## Overview
+
+The Raids System provides a comprehensive dungeon/arena framework with **wave-based combat**, **party management**, **NPC spawning**, and **reward distribution**. It integrates deeply with CustomNPC to create challenging PvE encounters with configurable difficulty and automated session management.
+
+<CardGroup cols={2}>
+  <Card title="Wave System" icon="water">
+    Multi-wave encounters with configurable NPCs, spawn points, and progression
+  </Card>
+  <Card title="Party Management" icon="users">
+    Group system with leader controls, member tracking, and readiness checks
+  </Card>
+  <Card title="CustomNPC Integration" icon="robot">
+    Automated NPC spawning, death tracking, and wave completion detection
+  </Card>
+  <Card title="Session Tracking" icon="clock">
+    Active raid sessions with player status, wave progress, and rewards
+  </Card>
+</CardGroup>
+
+## Architecture
+
+### Package Structure
+
+```
+org.debentialc.raids/
+├── commands/               # CLI interface
+│   ├── RaidCommand.java
+│   └── PartyCommand.java
+├── managers/               # Core business logic
+│   ├── RaidManager.java
+│   ├── RaidSessionManager.java
+│   ├── PartyManager.java
+│   ├── NPCSpawnManager.java
+│   ├── CooldownManager.java
+│   └── RaidStorageManager.java
+├── models/                 # Data structures
+│   ├── Raid.java
+│   ├── RaidSession.java
+│   ├── Party.java
+│   ├── Wave.java
+│   ├── SpawnPoint.java
+│   ├── WaveReward.java
+│   ├── RaidStatus.java
+│   └── WaveStatus.java
+├── events/                 # Event handlers
+│   ├── NPCDeathListener.java
+│   ├── PlayerDeathListener.java
+│   └── PlayerQuitListener.java
+├── menus/                  # GUI management
+│   ├── RaidMainMenu.java
+│   ├── RaidConfigMenu.java
+│   ├── RaidWavesMenu.java
+│   └── RaidSessionsMenu.java
+└── effects/                # Visual/audio effects
+    ├── RaidEffects.java
+    ├── RaidSoundManager.java
+    └── RaidTitleManager.java
+```
+
+### System Flow
+
+<Steps>
+  <Step title="Raid Creation">
+    Admin creates raid with `/raid create <id>` and configures waves via GUI
+  </Step>
+  <Step title="Party Formation">
+    Players form a party with `/party create` and invite members
+  </Step>
+  <Step title="Raid Start">
+    Party leader starts raid, creating a RaidSession
+  </Step>
+  <Step title="Wave Spawning">
+    NPCSpawnManager spawns NPCs at configured spawn points
+  </Step>
+  <Step title="Combat & Tracking">
+    NPCDeathListener tracks NPC deaths and wave progress
+  </Step>
+  <Step title="Wave Completion">
+    Rewards distributed, countdown to next wave begins
+  </Step>
+  <Step title="Raid Completion">
+    Final rewards given, players teleported to spawn
+  </Step>
+</Steps>
+
+## Core Models
+
+### Raid Model
+
+**Location:** `raids/models/Raid.java:15`
+
+```java
+@Getter
+@Setter
+public class Raid {
+    @Expose private String raidId;                 // Unique identifier
+    @Expose private String raidName;               // Display name
+    @Expose private String description;
+    @Expose private Location arenaSpawnPoint;      // NPC spawn location
+    @Expose private Location playerSpawnPoint;     // Player teleport point
+    @Expose private List<Wave> waves;              // Wave configuration
+    @Expose private RaidStatus status;             // IDLE/IN_PROGRESS/COMPLETED
+    @Expose private long cooldownSeconds;          // Cooldown between runs
+    @Expose private int minPlayers;                // Minimum party size (default: 1)
+    @Expose private int maxPlayers;                // Maximum party size (default: 5)
+    @Expose private boolean enabled;               // Active/disabled
+    @Expose private long createdAt;
+    @Expose private String createdBy;
+    
+    public boolean isConfigured() {
+        return playerSpawnPoint != null && !waves.isEmpty();
+    }
+}
+```
+
+<Note>
+**@Expose Annotation:** Used by Gson to avoid circular reference errors during JSON serialization. Only annotated fields are saved.
+</Note>
+
+### RaidSession Model
+
+**Location:** `raids/models/RaidSession.java:13`
+
+Tracks an active raid instance:
+
+```java
+@Getter
+@Setter
+public class RaidSession {
+    private String sessionId;                    // Unique session identifier
+    private Raid raid;                           // Raid configuration
+    private Party party;                         // Participating party
+    private int currentWaveIndex;                // Current wave (0-based)
+    private RaidStatus status;                   // Session status
+    private long startTime;                      // Session start timestamp
+    private long endTime;                        // Session end timestamp
+    
+    // Player tracking
+    private Set<UUID> activePlayers;             // Currently alive and present
+    private Set<UUID> deadPlayers;               // Died during raid
+    private Set<UUID> leftPlayers;               // Disconnected/left
+    
+    private String winner;                       // "PLAYERS" or "RAID"
+    
+    public Wave getCurrentWave() {
+        return raid.getWaveByIndex(currentWaveIndex);
+    }
+    
+    public boolean hasNextWave() {
+        return currentWaveIndex + 1 < raid.getTotalWaves();
+    }
+    
+    public void moveToNextWave() {
+        currentWaveIndex++;
+    }
+    
+    public boolean isRaidFailed() {
+        return activePlayers.isEmpty();
+    }
+    
+    public int getProgress() {
+        return (currentWaveIndex * 100) / Math.max(1, raid.getTotalWaves());
+    }
+}
+```
+
+### Wave Model
+
+**Location:** `raids/models/Wave.java`
+
+```java
+@Getter
+@Setter
+public class Wave {
+    @Expose private int waveNumber;                // Wave index (1-based)
+    @Expose private List<SpawnPoint> spawnPoints;  // NPC spawn configurations
+    @Expose private List<WaveReward> rewards;      // Rewards on completion
+    @Expose private WaveStatus status;             // PENDING/ACTIVE/COMPLETED/FAILED
+    @Expose private long startTime;
+    @Expose private long endTime;
+    
+    public int getTotalEnemies() {
+        return spawnPoints.stream()
+            .mapToInt(SpawnPoint::getCount)
+            .sum();
+    }
+    
+    public boolean hasRewards() {
+        return rewards != null && !rewards.isEmpty();
+    }
+}
+```
+
+### SpawnPoint Model
+
+**Location:** `raids/models/SpawnPoint.java`
+
+```java
+@Getter
+@Setter
+public class SpawnPoint {
+    @Expose private Location location;          // Where to spawn
+    @Expose private String npcName;             // CustomNPC identifier
+    @Expose private int count;                  // How many to spawn
+    @Expose private int delayTicks;             // Spawn delay (in ticks)
+    @Expose private boolean groupSpawn;         // Spawn all at once vs sequential
+    
+    private int aliveCount;                     // Runtime tracking
+    
+    public void resetAliveCount() {
+        this.aliveCount = count;
+    }
+}
+```
+
+## Wave Management
+
+### NPCSpawnManager
+
+**Location:** `raids/managers/NPCSpawnManager.java`
+
+Handles NPC spawning and tracking:
+
+```java
+public class NPCSpawnManager {
+    
+    // Track NPCs by wave
+    private static Map<String, Set<Integer>> waveNpcs = new ConcurrentHashMap<>();
+    // Map NPC entity ID → wave ID
+    private static Map<Integer, String> npcToWave = new ConcurrentHashMap<>();
+    // Track alive status
+    private static Map<Integer, Boolean> npcAliveStatus = new ConcurrentHashMap<>();
+    
+    /**
+     * Spawn all NPCs for a wave
+     */
+    public static boolean spawnWaveNpcs(Wave wave, String waveId) {
+        Set<Integer> spawnedNpcs = new HashSet<>();
+        
+        for (SpawnPoint spawnPoint : wave.getSpawnPoints()) {
+            Location loc = spawnPoint.getLocation();
+            String npcName = spawnPoint.getNpcName();
+            int count = spawnPoint.getCount();
+            
+            for (int i = 0; i < count; i++) {
+                // Spawn NPC using CustomNPC API
+                ICustomNpc npc = NpcAPI.Instance().spawnNPC(
+                    npcName, 
+                    loc.getWorld().getName(),
+                    loc.getX(), loc.getY(), loc.getZ()
+                );
+                
+                if (npc != null) {
+                    int entityId = npc.getEntityId();
+                    spawnedNpcs.add(entityId);
+                    npcToWave.put(entityId, waveId);
+                    npcAliveStatus.put(entityId, true);
+                }
+            }
+        }
+        
+        waveNpcs.put(waveId, spawnedNpcs);
+        return !spawnedNpcs.isEmpty();
+    }
+    
+    /**
+     * Mark NPC as dead
+     */
+    public static boolean markNpcDead(int entityId, String waveId) {
+        if (!npcAliveStatus.containsKey(entityId)) return false;
+        npcAliveStatus.put(entityId, false);
+        return true;
+    }
+    
+    /**
+     * Get alive NPCs count for wave
+     */
+    public static int getAliveNpcsCount(String waveId) {
+        Set<Integer> npcs = waveNpcs.get(waveId);
+        if (npcs == null) return 0;
+        
+        return (int) npcs.stream()
+            .filter(id -> npcAliveStatus.getOrDefault(id, false))
+            .count();
+    }
+}
+```
+
+### NPCDeathListener
+
+**Location:** `raids/events/NPCDeathListener.java:21`
+
+Listens to CustomNPC death events and manages wave progression:
+
+```java
+public void onNpcDie(INpcEvent.DiedEvent event) {
+    // 1. Get NPC entity ID
+    int entityId = event.getNpc().getEntityId();
+    
+    // 2. Find associated wave
+    String waveId = NPCSpawnManager.getWaveIdForNpc(entityId);
+    if (waveId == null) return; // Not a raid NPC
+    
+    // 3. Get raid session
+    RaidSession session = getSessionByWaveId(waveId);
+    if (session == null) return;
+    
+    // 4. Mark NPC as dead
+    boolean wasTracked = NPCSpawnManager.markNpcDead(entityId, waveId);
+    if (!wasTracked) return;
+    
+    // 5. Play death effects
+    playDeathEffects(session, killer);
+    
+    // 6. Check if wave is complete
+    int remaining = NPCSpawnManager.getAliveNpcsCount(waveId);
+    
+    if (remaining == 0) {
+        completeWave(session, waveId);
+    } else {
+        updateWaveProgress(session, remaining);
+    }
+}
+```
+
+### Wave Completion Flow
+
+**Location:** `raids/events/NPCDeathListener.java:99`
+
+```java
+private void completeWave(RaidSession session, String waveId) {
+    int waveNumber = session.getCurrentWaveIndex() + 1;
+    int totalWaves = session.getRaid().getTotalWaves();
+    boolean isLastWave = !session.hasNextWave();
+    
+    // 1. Notify players
+    List<Player> players = getActivePlayers(session);
+    for (Player player : players) {
+        player.sendMessage("");
+        player.sendMessage("§8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
+        
+        if (isLastWave) {
+            player.sendMessage("§6§l  🎉 ¡ÚLTIMA OLEADA COMPLETADA! 🎉");
+        } else {
+            player.sendMessage(String.format(
+                "§a§l  ✓ OLEADA %d/%d COMPLETADA ✓", waveNumber, totalWaves
+            ));
+        }
+        
+        player.sendMessage("§8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
+        player.sendMessage("");
+        
+        RaidSoundManager.playWaveCompleteSound(player);
+    }
+    
+    // 2. Execute rewards
+    executeWaveRewardsOnce(session);
+    
+    // 3. Clear tracking
+    NPCSpawnManager.clearWaveTracking(waveId);
+    
+    // 4. Next wave or complete raid
+    if (isLastWave) {
+        Bukkit.getScheduler().scheduleSyncDelayedTask(Main.instance, () -> {
+            completeRaidWithEffects(session);
+        }, 60L);
+    } else {
+        startWaveCountdown(session, waveId);
+    }
+}
+```
+
+### Wave Countdown System
+
+**Location:** `raids/events/NPCDeathListener.java:160`
+
+```java
+private void startWaveCountdown(RaidSession session, String previousWaveId) {
+    String countdownKey = session.getSessionId() + "_countdown";
+    
+    // Prevent duplicate countdowns
+    if (activeCountdowns.contains(countdownKey)) return;
+    activeCountdowns.add(countdownKey);
+    
+    List<Player> players = getActivePlayers(session);
+    int nextWaveNumber = session.getCurrentWaveIndex() + 2;
+    
+    // Initial notification
+    for (Player player : players) {
+        player.sendMessage("");
+        player.sendMessage("§6⏳ §fPreparándose para oleada §6" + nextWaveNumber + "§f...");
+        player.sendMessage("");
+    }
+    
+    final int[] countdown = {10}; // 10 second countdown
+    final boolean[] hasStartedWave = {false};
+    
+    int taskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(Main.instance, () -> {
+        if (hasStartedWave[0]) return;
+        
+        List<Player> currentPlayers = getActivePlayers(session);
+        
+        if (countdown[0] > 0) {
+            // Show countdown
+            String msg = getCountdownMessage(countdown[0]);
+            for (Player player : currentPlayers) {
+                player.sendMessage(msg);
+                if (countdown[0] <= 5) {
+                    RaidSoundManager.playAlertSound(player);
+                }
+            }
+            countdown[0]--;
+        } else {
+            // Start next wave
+            hasStartedWave[0] = true;
+            
+            for (Player player : currentPlayers) {
+                player.sendMessage("");
+                player.sendMessage("§c§l⚔ ¡OLEADA " + nextWaveNumber + " INICIADA! ⚔");
+                player.sendMessage("");
+                RaidSoundManager.playWaveStartSound(player);
+            }
+            
+            // Advance session
+            session.moveToNextWave();
+            Wave nextWave = session.getCurrentWave();
+            
+            if (nextWave != null) {
+                nextWave.setStatus(WaveStatus.ACTIVE);
+                String newWaveId = getWaveId(session);
+                NPCSpawnManager.spawnWaveNpcs(nextWave, newWaveId);
+            }
+            
+            // Cleanup
+            activeCountdowns.remove(countdownKey);
+            rewardsGiven.remove(previousWaveId);
+            Bukkit.getScheduler().cancelTask(taskId);
+        }
+    }, 20L, 20L); // Run every second
+    
+    countdownTasks.put(countdownKey, taskId);
+}
+```
+
+## Party System
+
+### Party Model
+
+**Location:** `raids/models/Party.java`
+
+```java
+@Getter
+@Setter
+public class Party {
+    private UUID partyId;
+    private UUID leader;                          // Party leader UUID
+    private Map<UUID, String> members;            // UUID → Player name
+    private Map<UUID, Boolean> readyStatus;       // UUID → Ready state
+    private PartyStatus status;                   // FORMING/READY/IN_RAID
+    private long createdAt;
+    
+    public boolean isLeader(UUID playerId) {
+        return leader.equals(playerId);
+    }
+    
+    public boolean allReady() {
+        return readyStatus.values().stream()
+            .allMatch(ready -> ready);
+    }
+    
+    public int getSize() {
+        return members.size();
+    }
+}
+```
+
+### PartyManager
+
+**Location:** `raids/managers/PartyManager.java`
+
+```java
+public class PartyManager {
+    private static Map<UUID, Party> parties = new ConcurrentHashMap<>();
+    private static Map<UUID, UUID> playerToParty = new ConcurrentHashMap<>();
+    
+    /**
+     * Create a new party
+     */
+    public static Party createParty(Player leader) {
+        if (playerToParty.containsKey(leader.getUniqueId())) {
+            return null; // Already in a party
+        }
+        
+        Party party = new Party();
+        party.setPartyId(UUID.randomUUID());
+        party.setLeader(leader.getUniqueId());
+        party.getMembers().put(leader.getUniqueId(), leader.getName());
+        party.getReadyStatus().put(leader.getUniqueId(), false);
+        party.setStatus(PartyStatus.FORMING);
+        party.setCreatedAt(System.currentTimeMillis());
+        
+        parties.put(party.getPartyId(), party);
+        playerToParty.put(leader.getUniqueId(), party.getPartyId());
+        
+        return party;
+    }
+    
+    /**
+     * Invite player to party
+     */
+    public static boolean invitePlayer(Party party, Player inviter, Player target) {
+        if (!party.isLeader(inviter.getUniqueId())) return false;
+        if (playerToParty.containsKey(target.getUniqueId())) return false;
+        
+        party.getMembers().put(target.getUniqueId(), target.getName());
+        party.getReadyStatus().put(target.getUniqueId(), false);
+        playerToParty.put(target.getUniqueId(), party.getPartyId());
+        
+        return true;
+    }
+    
+    /**
+     * Set player ready status
+     */
+    public static void setReady(Party party, UUID playerId, boolean ready) {
+        party.getReadyStatus().put(playerId, ready);
+        
+        if (party.allReady()) {
+            party.setStatus(PartyStatus.READY);
+        }
+    }
+}
+```
+
+## Reward System
+
+### WaveReward Model
+
+**Location:** `raids/models/WaveReward.java`
+
+```java
+@Getter
+@Setter
+public class WaveReward {
+    @Expose private String command;              // Command to execute
+    @Expose private double chance;               // 0.0-1.0 (100% = 1.0)
+    @Expose private boolean perPlayer;           // Execute per player vs once
+    @Expose private String displayName;          // For UI
+    
+    public boolean shouldExecute() {
+        return Math.random() < chance;
+    }
+}
+```
+
+### Reward Execution
+
+**Location:** `raids/events/NPCDeathListener.java:333`
+
+```java
+private void executeWaveRewardsOnce(RaidSession session) {
+    Wave wave = session.getCurrentWave();
+    if (wave == null || !wave.hasRewards()) return;
+    
+    for (WaveReward reward : wave.getRewards()) {
+        boolean shouldGive = reward.shouldExecute();
+        
+        if (shouldGive) {
+            for (UUID playerId : session.getActivePlayers()) {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null) {
+                    // Replace placeholders
+                    String command = reward.getCommand()
+                        .replace("@p", player.getName())
+                        .replace("@s", player.getName())
+                        .replace("{player}", player.getName());
+                    
+                    // Execute as console
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+                    
+                    // Feedback
+                    RaidSoundManager.playBuffSound(player);
+                    player.sendMessage("");
+                    player.sendMessage("§8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
+                    player.sendMessage("§6§l  ✦ RECOMPENSA ✦");
+                    player.sendMessage("§f" + getRewardDisplayName(reward.getCommand()));
+                    player.sendMessage("§8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
+                    player.sendMessage("");
+                }
+            }
+        }
+    }
+}
+```
+
+<Tip>
+**Command Placeholders:**
+- `@p` / `@s` / `{player}` → Player name
+- Executed as console, so no permissions needed
+</Tip>
+
+## Storage System
+
+### RaidStorageManager
+
+**Location:** `raids/managers/RaidStorageManager.java:18`
+
+Handles persistence with custom Gson configuration:
+
+```java
+private static final Gson GSON = new GsonBuilder()
+    .setPrettyPrinting()
+    .registerTypeAdapter(Location.class, new LocationAdapter())
+    .excludeFieldsWithoutExposeAnnotation() // Prevent circular references
+    .create();
+
+private static final String BASE_PATH = "plugins/Debentialc/data/raids";
+```
+
+**Storage Structure:**
+```
+plugins/Debentialc/data/raids/
+├── raids.json              # All raid configurations
+├── cooldowns.json          # Player cooldowns
+├── system_data.json        # System statistics
+└── raid_<id>/              # Individual raid data
+    └── config.json
+```
+
+### Location Adapter
+
+**Location:** `raids/managers/RaidStorageManager.java:41`
+
+```java
+private static class LocationAdapter 
+    implements JsonSerializer<Location>, JsonDeserializer<Location> {
+    
+    @Override
+    public JsonElement serialize(Location loc, Type type, 
+                                JsonSerializationContext context) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("world", loc.getWorld().getName());
+        obj.addProperty("x", loc.getX());
+        obj.addProperty("y", loc.getY());
+        obj.addProperty("z", loc.getZ());
+        obj.addProperty("yaw", loc.getYaw());
+        obj.addProperty("pitch", loc.getPitch());
+        return obj;
+    }
+    
+    @Override
+    public Location deserialize(JsonElement json, Type type,
+                                JsonDeserializationContext context) {
+        JsonObject obj = json.getAsJsonObject();
+        String worldName = obj.get("world").getAsString();
+        
+        World world = Bukkit.getWorld(worldName);
+        if (world == null) {
+            System.err.println("[Raids] Mundo no encontrado: " + worldName);
+            return null;
+        }
+        
+        return new Location(
+            world,
+            obj.get("x").getAsDouble(),
+            obj.get("y").getAsDouble(),
+            obj.get("z").getAsDouble(),
+            obj.get("yaw").getAsFloat(),
+            obj.get("pitch").getAsFloat()
+        );
+    }
+}
+```
+
+## Cooldown System
+
+### CooldownManager
+
+**Location:** `raids/managers/CooldownManager.java`
+
+```java
+public class CooldownManager {
+    // Map: Raid ID → (Player UUID → Cooldown end time)
+    private static Map<String, Map<UUID, Long>> cooldowns = new ConcurrentHashMap<>();
+    
+    /**
+     * Set cooldown for player on specific raid
+     */
+    public static void setCooldown(String raidId, UUID playerId, long durationSeconds) {
+        cooldowns.computeIfAbsent(raidId, k -> new ConcurrentHashMap<>())
+            .put(playerId, System.currentTimeMillis() + (durationSeconds * 1000));
+    }
+    
+    /**
+     * Check if player has active cooldown
+     */
+    public static boolean hasCooldown(String raidId, UUID playerId) {
+        Map<UUID, Long> raidCooldowns = cooldowns.get(raidId);
+        if (raidCooldowns == null) return false;
+        
+        Long endTime = raidCooldowns.get(playerId);
+        if (endTime == null) return false;
+        
+        if (System.currentTimeMillis() >= endTime) {
+            raidCooldowns.remove(playerId);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Get remaining cooldown in seconds
+     */
+    public static long getRemainingCooldown(String raidId, UUID playerId) {
+        Map<UUID, Long> raidCooldowns = cooldowns.get(raidId);
+        if (raidCooldowns == null) return 0;
+        
+        Long endTime = raidCooldowns.get(playerId);
+        if (endTime == null) return 0;
+        
+        long remaining = (endTime - System.currentTimeMillis()) / 1000;
+        return Math.max(0, remaining);
+    }
+}
+```
+
+## Commands
+
+<Accordion title="/raid - Raid management command">
+  **Permission:** `debentialc.admin.raid`
+  
+  **Subcommands:**
+  - `/raid create <id> <name>` - Create new raid
+  - `/raid delete <id>` - Delete raid configuration
+  - `/raid list` - List all raids
+  - `/raid info <id>` - View raid details
+  - `/raid start <id>` - Start raid for your party
+  - `/raid stop` - Force stop active raid session
+  - `/raid menu` - Open raid configuration GUI
+</Accordion>
+
+<Accordion title="/party - Party management command">
+  **Permission:** (none - available to all players)
+  
+  **Subcommands:**
+  - `/party create` - Create a new party
+  - `/party invite <player>` - Invite player to party
+  - `/party kick <player>` - Remove player from party (leader only)
+  - `/party leave` - Leave current party
+  - `/party ready` - Toggle ready status
+  - `/party list` - List party members and ready status
+  - `/party disband` - Disband party (leader only)
+</Accordion>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Balance Difficulty" icon="scale-balanced">
+    Test wave configurations with different party sizes to ensure fair difficulty
+  </Card>
+  <Card title="Progressive Rewards" icon="arrow-up">
+    Increase reward quality/quantity with each wave to maintain engagement
+  </Card>
+  <Card title="Clear Feedback" icon="comment">
+    Use titles, sounds, and messages to keep players informed of raid status
+  </Card>
+  <Card title="Cooldown Management" icon="clock">
+    Set appropriate cooldowns to prevent farming while allowing replayability
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="NPCs not spawning">
+  **Solutions:**
+  1. Verify CustomNPC is installed and loaded
+  2. Check NPC name matches exactly (case-sensitive)
+  3. Ensure spawn location world exists and is loaded
+  4. Check console for CustomNPC API errors
+  5. Verify arena spawn point is set: `/raid menu`
+</Accordion>
+
+<Accordion title="Wave not completing">
+  **Solutions:**
+  1. Check if all NPCs were properly tracked (console logs)
+  2. Look for NPCs that fell out of world or despawned
+  3. Admin can force complete: `/raid stop`
+  4. Check `NPCSpawnManager` tracking maps for stuck entries
+</Accordion>
+
+<Accordion title="Rewards not executing">
+  **Solutions:**
+  1. Verify command syntax is valid
+  2. Check chance value (0.0-1.0)
+  3. Ensure placeholders are used: `@p` not literal player name
+  4. Test command manually from console
+  5. Check for command execution errors in console
+</Accordion>
+
+## Related Systems
+
+<CardGroup cols={2}>
+  <Card title="Boosters" href="/systems/boosters">
+    Apply booster multipliers to raid TP rewards
+  </Card>
+  <Card title="Custom Items" href="/systems/custom-items">
+    Award custom items and fragments as raid rewards
+  </Card>
+</CardGroup>

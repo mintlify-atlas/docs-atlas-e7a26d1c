@@ -1,0 +1,434 @@
+---
+title: 'PlaceholderAPI Integration'
+description: 'Complete guide to using Debentialc placeholders in your server'
+---
+
+## Overview
+
+Debentialc provides extensive PlaceholderAPI integration for displaying booster information, player stats, and server data in chat, scoreboards, holograms, and other plugins.
+
+<Note>
+  **Requirement**: PlaceholderAPI must be installed on your server. Download from [SpigotMC](https://www.spigotmc.org/resources/placeholderapi.6245/).
+</Note>
+
+## Installation
+
+1. Install PlaceholderAPI on your server
+2. Install Debentialc plugin
+3. Restart server - expansions register automatically
+4. Verify with `/papi list` - you should see `boosters` and `debentialc`
+
+## Available Expansions
+
+### Boosters Expansion (`%boosters_<placeholder>%`)
+
+#### Global Booster Placeholders
+
+<AccordionGroup>
+  <Accordion title="Global Booster Status">
+    | Placeholder | Description | Example Output |
+    |-------------|-------------|----------------|
+    | `%boosters_global_active%` | Global booster status | `§aActivo` or `§cInactivo` |
+    | `%boosters_global_multiplier%` | Current multiplier | `§62.50x` |
+    | `%boosters_global_percentage%` | Bonus percentage | `§a+150%` |
+    | `%boosters_global_time%` | Time remaining | `§61h 30m 45s` |
+    | `%boosters_global_activator%` | Who activated it | `§6AdminName` |
+    
+    **Source**: `BoosterPlaceholder.java:48-67`
+    
+    **Usage example**:
+    ```yaml
+    # In DeluxeMenus
+    display_name: "Global Booster: %boosters_global_active%"
+    lore:
+      - "Multiplier: %boosters_global_multiplier%"
+      - "Bonus: %boosters_global_percentage%"
+      - "Time: %boosters_global_time%"
+      - "By: %boosters_global_activator%"
+    ```
+  </Accordion>
+
+  <Accordion title="Personal Booster Status">
+    | Placeholder | Description | Example Output |
+    |-------------|-------------|----------------|
+    | `%boosters_personal_active%` | Personal booster status | `§aActivo` or `§cInactivo` |
+    | `%boosters_personal_multiplier%` | Personal multiplier | `§61.50x` |
+    | `%boosters_personal_percentage%` | Personal bonus | `§a+50%` |
+    | `%boosters_personal_level%` | Booster tier name | `§6Legendary` |
+    | `%boosters_personal_time%` | Time remaining | `§614m 32s` |
+    | `%boosters_personal_count%` | Available boosters | `§63` |
+    
+    **Source**: `BoosterPlaceholder.java:69-108`
+    
+    **Usage example**:
+    ```yaml
+    # In FeatherBoard scoreboard
+    - "Personal Booster"
+    - "Status: %boosters_personal_active%"
+    - "Level: %boosters_personal_level%"
+    - "Bonus: %boosters_personal_percentage%"
+    - "Time: %boosters_personal_time%"
+    ```
+  </Accordion>
+
+  <Accordion title="Combined Booster Information">
+    | Placeholder | Description | Example Output |
+    |-------------|-------------|----------------|
+    | `%boosters_combined_multiplier%` | Total multiplier (global × personal) | `§63.75x` |
+    | `%boosters_combined_percentage%` | Total bonus percentage | `§a+275%` |
+    | `%boosters_any_active%` | Any booster active | `§aActivo` |
+    
+    **Source**: `BoosterPlaceholder.java:109-128`
+    
+    **Formula**: Combined multiplier = Global × Personal
+    
+    **Example calculation**:
+    - Global: 2.5x
+    - Personal: 1.5x
+    - Combined: 2.5 × 1.5 = 3.75x
+    - Percentage: (3.75 - 1.0) × 100 = +275%
+    
+    **Usage example**:
+    ```yaml
+    # In chat format plugin
+    format: "[%boosters_combined_multiplier%] {USERNAME}: {MESSAGE}"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Debentialc Expansion (`%debentialc_<placeholder>%`)
+
+#### Player Statistics
+
+<AccordionGroup>
+  <Accordion title="CustomNPCs Integration">
+    | Placeholder | Description | Example Output |
+    |-------------|-------------|----------------|
+    | `%debentialc_level%` | Player's DBC level | `150` |
+    | `%debentialc_tps%` | Transformation Points | `5000000` |
+    | `%debentialc_race%` | Player's race | `Saiyan` |
+    | `%debentialc_category%` | Rank color code | `§6§lSuper Saiyan` |
+    
+    **Source**: `DebentialcPlaceHolder.java:46-156`
+    
+    <Warning>
+      These placeholders require CustomNPCs plugin and DBC mod. They return `0` or empty string if not available.
+    </Warning>
+    
+    **Usage example**:
+    ```yaml
+    # In tab list
+    tablist-format: "%debentialc_race% %player% [Lv.%debentialc_level%]"
+    ```
+  </Accordion>
+
+  <Accordion title="Booster Statistics (Alternative Format)">
+    | Placeholder | Description |
+    |-------------|-------------|
+    | `%debentialc_booster_global_multiplier%` | Global booster multiplier |
+    | `%debentialc_booster_global_remaining%` | Time remaining on global |
+    | `%debentialc_booster_global_active%` | Global active status |
+    | `%debentialc_booster_global_percentage%` | Global bonus percentage |
+    | `%debentialc_booster_personal_multiplier%` | Personal multiplier |
+    | `%debentialc_booster_personal_remaining%` | Personal time remaining |
+    | `%debentialc_booster_personal_active%` | Personal active status |
+    | `%debentialc_booster_personal_level%` | Personal booster level |
+    | `%debentialc_booster_combined_multiplier%` | Combined multiplier |
+    | `%debentialc_booster_combined_percentage%` | Combined percentage |
+    | `%debentialc_booster_any_active%` | Any booster active |
+    
+    **Note**: These support both hyphen and underscore formats:
+    - `%debentialc_booster_global_multiplier%`
+    - `%debentialc_booster-global-multiplier%`
+    
+    **Source**: `DebentialcPlaceHolder.java:77-152`
+  </Accordion>
+
+  <Accordion title="Server Information">
+    | Placeholder | Description | Example Output |
+    |-------------|-------------|----------------|
+    | `%debentialc_online%` | Online player count | `42` |
+    | `%debentialc_bank_balance%` | Player bank (if integrated) | `1000000` |
+    
+    **Usage example**:
+    ```yaml
+    # In welcome message
+    - "Welcome to the server!"
+    - "Players online: %debentialc_online%"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Integration Examples
+
+### Scoreboard (FeatherBoard)
+
+```yaml
+booster-board:
+  interval: 20
+  lines:
+    - "&6&m━━━━━━━━━━━━━━━━"
+    - "&e&lBOOSTERS"
+    - ""
+    - "&7Global: %boosters_global_active%"
+    - "&7Bonus: %boosters_global_percentage%"
+    - "&7Time: %boosters_global_time%"
+    - ""
+    - "&7Personal: %boosters_personal_active%"
+    - "&7Your Bonus: %boosters_personal_percentage%"
+    - ""
+    - "&7Total: %boosters_combined_multiplier%"
+    - "&6&m━━━━━━━━━━━━━━━━"
+```
+
+### Hologram (HolographicDisplays)
+
+```yaml
+# holograms.yml
+booster-info:
+  location: world:100:64:200
+  lines:
+    - "&6&l⚡ ACTIVE BOOSTERS ⚡"
+    - ""
+    - "&eGlobal Multiplier: %boosters_global_multiplier%"
+    - "&eStatus: %boosters_global_active%"
+    - "&eTime Left: %boosters_global_time%"
+    - ""
+    - "&7Your Personal: %boosters_personal_level%"
+    - "&7Bonus: %boosters_personal_percentage%"
+```
+
+### Chat Format (EssentialsX)
+
+```yaml
+# In Essentials config.yml
+format: '{DISPLAYNAME}&7: &r{MESSAGE}'
+
+# Or with booster indicator
+format: '%boosters_any_active% {DISPLAYNAME}&7: &r{MESSAGE}'
+```
+
+### GUI Menu (DeluxeMenus)
+
+```yaml
+menu_title: "Booster Information"
+items:
+  global_booster:
+    material: NETHER_STAR
+    slot: 13
+    display_name: "&6&lGlobal Booster"
+    lore:
+      - "&7Status: %boosters_global_active%"
+      - "&7Multiplier: %boosters_global_multiplier%"
+      - "&7Bonus: %boosters_global_percentage%"
+      - ""
+      - "&7Time Remaining:"
+      - "&e%boosters_global_time%"
+      - ""
+      - "&7Activated by: %boosters_global_activator%"
+    
+  personal_booster:
+    material: DIAMOND
+    slot: 15
+    display_name: "&b&lYour Personal Booster"
+    lore:
+      - "&7Status: %boosters_personal_active%"
+      - "&7Level: %boosters_personal_level%"
+      - "&7Multiplier: %boosters_personal_multiplier%"
+      - "&7Bonus: %boosters_personal_percentage%"
+      - ""
+      - "&7Available: %boosters_personal_count%"
+      - "&7Time Left: %boosters_personal_time%"
+    
+  combined_info:
+    material: BEACON
+    slot: 31
+    display_name: "&d&lTotal Multiplier"
+    lore:
+      - "&7Your total bonus from all boosters:"
+      - ""
+      - "&eMultiplier: %boosters_combined_multiplier%"
+      - "&eBONUS: %boosters_combined_percentage%"
+```
+
+### Action Bar (TitleManager)
+
+```yaml
+# Show booster info in action bar
+actionbar:
+  enabled: true
+  message: "&6Booster: %boosters_combined_percentage% &7| &eTime: %boosters_global_time%"
+```
+
+### Boss Bar (BossBarAPI)
+
+```java
+// In your plugin or script
+BossBar bar = Bukkit.createBossBar(
+    ChatColor.translateAlternateColorCodes('&', 
+        "&6Active Booster: " + PlaceholderAPI.setPlaceholders(player, "%boosters_combined_percentage%")
+    ),
+    BarColor.YELLOW,
+    BarStyle.SOLID
+);
+```
+
+## Placeholder Behavior
+
+### Player-Specific Placeholders
+
+<Warning>
+  Some placeholders require a player context and return default values when used globally:
+  
+  - `personal_*` placeholders return `§cInactivo` or `§7Ninguno`
+  - `combined_*` placeholders use only global multiplier
+  - `level`, `tps`, `race` return `0` or empty string
+</Warning>
+
+**Source reference**: `BoosterPlaceholder.java:136-144`
+
+### Time Formatting
+
+Time placeholders automatically format based on duration:
+
+```
+Hours remaining:   "2h 30m 15s"
+Minutes remaining: "45m 20s"
+Seconds remaining: "30s"
+Expired:           "§cExpirado"
+```
+
+**Source**: `BoosterPlaceholder.java:148-165`
+
+### Color Codes
+
+Placeholders include color codes:
+
+- `§a` - Green (active, positive)
+- `§c` - Red (inactive, negative)
+- `§6` - Gold (values, numbers)
+- `§7` - Gray (none, zero)
+- `§b` - Aqua (personal)
+- `§e` - Yellow (emphasis)
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Placeholders show as text">
+    **Problem**: `%boosters_global_active%` displays literally
+    
+    **Solutions**:
+    1. Verify PlaceholderAPI is installed: `/papi list`
+    2. Check expansion is registered: `/papi info boosters`
+    3. Restart server after installing Debentialc
+    4. Use `/papi parse me <placeholder>` to test
+    
+    **Example**:
+    ```
+    /papi parse me %boosters_global_multiplier%
+    ```
+  </Accordion>
+
+  <Accordion title="Placeholders return empty or default values">
+    **Problem**: Placeholders return `0`, `§cInactivo`, or empty strings
+    
+    **Common causes**:
+    1. No booster is currently active
+    2. Using personal placeholder without player context
+    3. CustomNPCs not installed (for DBC placeholders)
+    4. Player not loaded in DBC system
+    
+    **Verification**:
+    ```
+    /booster info
+    /papi parse <player> %boosters_personal_active%
+    ```
+  </Accordion>
+
+  <Accordion title="Booster expansion not found">
+    **Problem**: `/papi info boosters` shows "Expansion not found"
+    
+    **Solutions**:
+    1. Verify Debentialc is loaded: `/plugins`
+    2. Check console for registration errors
+    3. Ensure PlaceholderAPI loads before Debentialc
+    4. Try manual registration: `/papi register boosters`
+    
+    **Check logs for**:
+    ```
+    [Boosters] PlaceholderAPI expansion registered
+    ```
+  </Accordion>
+
+  <Accordion title="Colors not displaying">
+    **Problem**: Color codes show as `§a`, `§6`, etc.
+    
+    **Solution**: The receiving plugin must support color codes. Use:
+    - `ChatColor.translateAlternateColorCodes()` in Java
+    - Built-in translation in most modern plugins
+    - Replace `§` with `&` if plugin expects alternate codes
+  </Accordion>
+</AccordionGroup>
+
+## Testing Placeholders
+
+### Command Line Testing
+
+```bash
+# Test any placeholder
+/papi parse me %boosters_combined_multiplier%
+
+# Test another player
+/papi parse PlayerName %boosters_personal_level%
+
+# Test all booster placeholders
+/papi parse me %boosters_global_active%
+/papi parse me %boosters_personal_active%
+/papi parse me %boosters_combined_percentage%
+```
+
+### Debug Mode
+
+```yaml
+# In PlaceholderAPI config.yml
+boolean_true: 'true'
+boolean_false: 'false'
+```
+
+## Advanced Usage
+
+### Conditional Formatting
+
+```yaml
+# Using PlaceholderAPI's internal placeholders
+display_name: "%rel_if_{boosters_personal_active}=='Activo'%&aBooster Active%rel_endif%"
+```
+
+### Animation
+
+```yaml
+# Animated hologram
+lines:
+  - "&6&l⚡ %animation:booster% ⚡"
+  - "Bonus: %boosters_combined_percentage%"
+```
+
+## API for Developers
+
+Integrate placeholders in your own plugins:
+
+```java
+import me.clip.placeholderapi.PlaceholderAPI;
+
+String formatted = PlaceholderAPI.setPlaceholders(player, 
+    "Your total multiplier: %boosters_combined_multiplier%"
+);
+
+player.sendMessage(formatted);
+```
+
+## See Also
+
+- [Booster System Guide](/systems/boosters) - How boosters work
+- [Configuration](/configuration) - Configure booster settings
+- [Storage](/advanced/storage) - How booster data is stored

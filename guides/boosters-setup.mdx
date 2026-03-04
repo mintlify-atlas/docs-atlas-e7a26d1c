@@ -1,0 +1,303 @@
+---
+title: 'Booster System Setup'
+description: 'Learn how to configure and activate global and personal boosters to enhance gameplay multipliers'
+---
+
+The Debentialc plugin provides a comprehensive booster system that allows you to apply temporary multipliers to player activities. This guide covers both global (server-wide) and personal (individual player) boosters.
+
+## Overview
+
+Boosters apply multipliers to various game mechanics like experience, drops, or custom stats. There are two types:
+
+- **Global Boosters**: Affect all players on the server
+- **Personal Boosters**: Affect individual players and stack with global boosters
+
+## Global Boosters
+
+### Activating a Global Booster
+
+Global boosters are activated by administrators and apply to all online players.
+
+<Steps>
+  <Step title="Check current multiplier">
+    Use the `exampleUsage()` method pattern to check active boosters:
+    
+    ```java Main.java:156-166
+    Player player = Bukkit.getPlayer("PlayerName");
+    if (player == null) return;
+
+    double globalMult = GlobalBoosterManager.getCurrentMultiplier();
+    double personalMult = PersonalBoosterManager.getActiveMultiplier(player.getUniqueId());
+    double combined = BoosterUtils.calculateCombinedMultiplier(player.getUniqueId());
+
+    player.sendMessage("Global: " + BoosterUtils.formatMultiplier(globalMult));
+    player.sendMessage("Personal: " + BoosterUtils.formatMultiplier(personalMult));
+    player.sendMessage("Combined: " + BoosterUtils.formatMultiplier(combined));
+    ```
+  </Step>
+  
+  <Step title="Activate the booster">
+    Use the command or API to activate a global booster:
+    
+    ```bash
+    /booster global activate 50% 1h
+    /booster global activate 150% 2h30m
+    ```
+    
+    Or via API:
+    
+    ```java Main.java:200-209
+    GlobalBoosterManager.activateBooster(2.5, "AdminName");
+
+    Bukkit.broadcastMessage("§6§lBooster Activado: 2.5x durante 1 hora");
+
+    Bukkit.getScheduler().scheduleSyncDelayedTask(
+            Bukkit.getPluginManager().getPlugin("Debentialc"),
+            () -> GlobalBoosterManager.deactivateBooster(),
+            3600 * 20
+    );
+    ```
+  </Step>
+  
+  <Step title="Monitor active boosters">
+    Check if a booster is currently active:
+    
+    ```java Main.java:168-182
+    boolean hasGlobal = GlobalBoosterManager.isBoosterActive();
+    PersonalBooster active = PersonalBoosterManager.getActiveBooster(player.getUniqueId());
+
+    if (hasGlobal) {
+        player.sendMessage("Booster global activo: " +
+                BoosterUtils.formatPercentage(globalMult));
+    }
+
+    if (active != null) {
+        player.sendMessage("Booster personal activo: " +
+                BoosterUtils.formatPercentage(active.getMultiplier()));
+        player.sendMessage("Nivel: " + active.getLevelName());
+        player.sendMessage("Tiempo restante: " +
+                BoosterUtils.formatTime(active.getActivationTimeRemaining(900)));
+    }
+    ```
+  </Step>
+</Steps>
+
+### Global Booster Commands
+
+<CodeGroup>
+```bash Activate
+/booster global activate <percentage> [time]
+# Examples:
+/booster global activate 50%      # Uses default duration
+/booster global activate 150% 1h  # 150% bonus for 1 hour
+/booster global activate 200% 2h30m  # 200% bonus for 2.5 hours
+```
+
+```bash Deactivate
+/booster global deactivate
+```
+
+```bash Check Status
+/booster global info
+/booster info
+```
+</CodeGroup>
+
+<Note>
+  Time formats support: `d` (days), `h` (hours), `m` (minutes), `s` (seconds)
+  
+  Example: `1d2h30m` = 1 day, 2 hours, 30 minutes
+</Note>
+
+## Personal Boosters
+
+### Adding Personal Boosters
+
+Personal boosters are given to individual players and can be activated when needed.
+
+<Steps>
+  <Step title="Give a booster to a player">
+    Use the command to grant a personal booster:
+    
+    ```bash
+    /booster personal add <player> <level>
+    # Level must be between 1-5
+    ```
+    
+    Or via API:
+    
+    ```java Main.java:212-222
+    Player player = Bukkit.getPlayer("PlayerName");
+    if (player == null) return;
+
+    int level = 4;
+    double multiplier = BoosterSettings.getPersonalBoosterMultiplier(level);
+    PersonalBooster booster = new PersonalBooster(player.getUniqueId(), level, multiplier);
+
+    PersonalBoosterManager.addBooster(booster);
+    player.sendMessage("§aHas recibido un booster personal nivel " + level);
+    ```
+  </Step>
+  
+  <Step title="Player activates their booster">
+    Players can list and activate their boosters:
+    
+    ```bash
+    /booster personal list
+    /booster personal activate <index>
+    ```
+  </Step>
+</Steps>
+
+### Personal Booster Levels
+
+Default multiplier values (can be customized):
+
+| Level | Default Multiplier | Bonus Percentage |
+|-------|-------------------|------------------|
+| 1     | 0.15              | +15%             |
+| 2     | 0.30              | +30%             |
+| 3     | 0.60              | +60%             |
+| 4     | 1.20              | +120%            |
+| 5     | 2.50              | +250%            |
+
+## Configuration
+
+### Customizing Booster Values
+
+You can customize multipliers and durations programmatically:
+
+```java Main.java:185-198
+BoosterSettings.setPersonalBoosterMultiplier(1, 0.15);
+BoosterSettings.setPersonalBoosterMultiplier(2, 0.30);
+BoosterSettings.setPersonalBoosterMultiplier(3, 0.60);
+BoosterSettings.setPersonalBoosterMultiplier(4, 1.20);
+BoosterSettings.setPersonalBoosterMultiplier(5, 2.50);
+
+BoosterSettings.setRankMultiplier("admin", 3.0);
+BoosterSettings.setRankMultiplier("moderator", 2.0);
+BoosterSettings.setRankMultiplier("vip", 1.5);
+
+BoosterSettings.setGlobalBoosterDuration(7200);
+BoosterSettings.setPersonalBoosterDuration(1800);
+```
+
+<Accordion title="Configuration Options">
+  - `setPersonalBoosterMultiplier(level, multiplier)` - Set multiplier for each level
+  - `setRankMultiplier(rank, multiplier)` - Set rank-based multipliers
+  - `setGlobalBoosterDuration(seconds)` - Default duration for global boosters
+  - `setPersonalBoosterDuration(seconds)` - Default duration for personal boosters
+</Accordion>
+
+## Applying Boosters to Calculations
+
+### Using Combined Multipliers
+
+When calculating values that should be affected by boosters:
+
+```java Main.java:224-231
+public static void applyBoosterInCalculation(Player player, double baseValue) {
+    double multiplier = BoosterUtils.calculateCombinedMultiplier(player.getUniqueId());
+    double result = baseValue * multiplier;
+
+    player.sendMessage("§aValor base: " + baseValue);
+    player.sendMessage("§eMultiplicador: " + BoosterUtils.formatMultiplier(multiplier));
+    player.sendMessage("§6Resultado: " + result);
+}
+```
+
+<Warning>
+  Always use `BoosterUtils.calculateCombinedMultiplier()` to get the total multiplier. This method automatically combines global and personal boosters correctly.
+</Warning>
+
+### Integration Example
+
+Integrate boosters into your custom mechanics:
+
+```java
+// In your custom event or calculation
+Player player = event.getPlayer();
+double baseReward = 100.0;
+
+// Apply booster multiplier
+double multiplier = BoosterUtils.calculateCombinedMultiplier(player.getUniqueId());
+double finalReward = baseReward * multiplier;
+
+// Give reward to player
+giveReward(player, finalReward);
+```
+
+## Data Persistence
+
+### Saving and Loading
+
+Booster data is automatically saved, but you can manually trigger save/load:
+
+```bash
+/booster save  # Save all booster data
+/booster load  # Load booster data from disk
+```
+
+<Tip>
+  Booster data is stored in `plugins/Debentialc/data/boosters/` and automatically persists across server restarts.
+</Tip>
+
+## PlaceholderAPI Integration
+
+If you have PlaceholderAPI installed, boosters expose several placeholders:
+
+- `%debentialc_booster_global%` - Current global multiplier
+- `%debentialc_booster_personal%` - Player's personal multiplier
+- `%debentialc_booster_combined%` - Combined multiplier for the player
+- `%debentialc_booster_active%` - Whether player has any active booster
+
+## Permissions
+
+Required permissions for booster commands:
+
+| Command | Permission |
+|---------|------------|
+| `/booster global` | `dbcplugin.command.booster` |
+| `/booster personal add` | `dbcplugin.command.booster` |
+| `/booster personal activate` | Default (all players) |
+| `/booster personal list` | Default (all players) |
+
+## Best Practices
+
+<Steps>
+  <Step title="Event coordination">
+    Schedule global boosters during events or peak hours to encourage player activity.
+  </Step>
+  
+  <Step title="Reward system">
+    Use personal boosters as rewards for achievements, donations, or participation.
+  </Step>
+  
+  <Step title="Balance testing">
+    Test multiplier values to ensure they don't break your economy or progression systems.
+  </Step>
+  
+  <Step title="Clear communication">
+    Always broadcast when global boosters are activated so players are aware of the bonus period.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="Booster not applying">
+  - Verify the booster is active with `/booster info`
+  - Check that your calculation code uses `BoosterUtils.calculateCombinedMultiplier()`
+  - Ensure the player UUID is correctly passed to the booster methods
+</Accordion>
+
+<Accordion title="Boosters not persisting">
+  - Check file permissions in `plugins/Debentialc/data/boosters/`
+  - Verify BoosterModule is initialized in your Main class
+  - Use `/booster save` before server shutdown
+</Accordion>
+
+<Accordion title="Personal boosters not stacking">
+  - Personal and global boosters stack automatically
+  - Only one personal booster can be active per player at a time
+  - Use `calculateCombinedMultiplier()` to get the stacked result
+</Accordion>

@@ -1,0 +1,461 @@
+---
+title: Installation
+description: Complete installation guide for Debentialc plugin including dependencies and server setup
+---
+
+# Installation
+
+This guide covers the complete installation process for Debentialc v1.1.5 on your Bukkit/Spigot Minecraft server.
+
+## Prerequisites
+
+<Note>
+  Debentialc requires **Java 8 or higher** and a **Bukkit/Spigot 1.8+** server.
+</Note>
+
+Before installing Debentialc, ensure your server meets these requirements:
+
+- **Server Software**: Bukkit, Spigot, or Paper (1.8 or newer)
+- **Java Version**: Java 8+ (Java 11 or 17 recommended)
+- **RAM**: Minimum 2GB allocated to the server
+- **Permissions Plugin**: Any compatible permissions manager (optional, for rank-based boosters)
+
+## Step 1: Download Debentialc
+
+<Steps>
+  <Step title="Download the Plugin">
+    Download the latest `Debentialc.jar` file from your distribution source.
+  </Step>
+  
+  <Step title="Verify File Integrity">
+    Ensure the downloaded JAR file is complete and not corrupted. The file should be approximately 1-3 MB in size.
+  </Step>
+</Steps>
+
+## Step 2: Install Core Plugin
+
+<Steps>
+  <Step title="Stop Your Server">
+    If your server is running, stop it gracefully:
+    ```bash
+    stop
+    ```
+  </Step>
+  
+  <Step title="Place Plugin File">
+    Copy `Debentialc.jar` to your server's `plugins/` directory:
+    ```bash
+    cp Debentialc.jar /path/to/server/plugins/
+    ```
+  </Step>
+  
+  <Step title="Verify Plugin Structure">
+    The plugin will create its data directory on first startup:
+    ```
+    plugins/
+    ├── Debentialc.jar
+    └── Debentialc/  (created on first run)
+    ```
+  </Step>
+</Steps>
+
+## Step 3: Install Dependencies
+
+Debentialc has one required dependency (bundled) and three optional dependencies for extended functionality.
+
+### Required: Rhino JavaScript Engine
+
+<Note>
+  Rhino 1.7.14 is **bundled with the plugin** - no separate installation needed.
+</Note>
+
+The plugin includes Mozilla Rhino for JavaScript execution, as defined in `pom.xml:16-21`:
+
+```xml
+<dependency>
+    <groupId>org.mozilla</groupId>
+    <artifactId>rhino</artifactId>
+    <version>1.7.14</version>
+</dependency>
+```
+
+### Optional: PlaceholderAPI
+
+<Accordion title="PlaceholderAPI - For Booster Placeholders">
+  **Purpose**: Enables booster status placeholders in chat, scoreboards, and tab lists.
+  
+  **Installation**:
+  
+  1. Download PlaceholderAPI from SpigotMC:
+     ```bash
+     wget https://www.spigotmc.org/resources/placeholderapi.6245/
+     ```
+  
+  2. Place `PlaceholderAPI.jar` in your `plugins/` folder
+  
+  3. Restart your server
+  
+  4. Verify integration:
+     ```bash
+     /plugins
+     # Should show both Debentialc and PlaceholderAPI in green
+     ```
+  
+  **Detection**: The plugin automatically detects PlaceholderAPI on startup (see Main.java:75, BoosterModule.java:42-54):
+  
+  ```java
+  if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+      placeholderExpansion = new BoosterPlaceholder();
+      if (placeholderExpansion.register()) {
+          plugin.getLogger().info("PlaceholderAPI hook registered");
+      }
+  }
+  ```
+  
+  **Available Placeholders**:
+  - `%debentialc_booster_global%` - Global booster multiplier
+  - `%debentialc_booster_personal%` - Personal booster multiplier
+  - `%debentialc_booster_combined%` - Combined multiplier
+  - `%debentialc_booster_time_remaining%` - Time left on active booster
+</Accordion>
+
+### Optional: Vault (Economy)
+
+<Accordion title="Vault - For Territory Economy">
+  **Purpose**: Required for territory purchase/sale functionality with in-game currency.
+  
+  **Installation**:
+  
+  1. Download Vault from SpigotMC
+  
+  2. Install an economy plugin (EssentialsX, CMI, etc.)
+  
+  3. Place both JARs in `plugins/` folder
+  
+  4. Configure your economy plugin first
+  
+  5. Restart the server
+  
+  **Verification**:
+  ```bash
+  /vault-info
+  # Should show your economy plugin as registered
+  ```
+  
+  **Usage in Debentialc**:
+  
+  The claims system uses Vault for territory transactions (TerrainCommand.java:336-338):
+  
+  ```java
+  if (TerrainManager.getInstance().getEconomy() != null && refund > 0) {
+      TerrainManager.getInstance().getEconomy().depositPlayer(player.getName(), refund);
+      player.sendMessage("Terrain sold. Refund: $" + (int) refund);
+  }
+  ```
+  
+  <Warning>
+    Without Vault, territory commands will work but purchases/refunds will be disabled.
+  </Warning>
+</Accordion>
+
+### Optional: CustomNPCs
+
+<Accordion title="CustomNPCs - For Raid System">
+  **Purpose**: **Required** for the Raid system to function. Provides NPC event integration.
+  
+  **Installation**:
+  
+  1. Download CustomNPCs from CurseForge or the official site
+  
+  2. Place the JAR in your `plugins/` or `mods/` folder (depending on your setup)
+  
+  3. Restart your server
+  
+  4. Verify detection in console:
+     ```
+     [Debentialc] [Raids] NPCDeathListener registered correctly in CustomNPCs
+     ```
+  
+  **Integration Details** (Main.java:105-129):
+  
+  ```java
+  private void registerCustomNPCsEvents() {
+      getServer().getScheduler().runTaskLater(this, () -> {
+          if (!noppes.npcs.api.AbstractNpcAPI.IsAvailable()) {
+              getLogger().warning("[Raids] CustomNPCs not available");
+              getLogger().warning("[Raids] Ensure CustomNPCs is installed");
+              return;
+          }
+          
+          noppes.npcs.api.AbstractNpcAPI api = 
+              noppes.npcs.api.AbstractNpcAPI.Instance();
+          api.events().register(new NPCDeathListener());
+          
+          getLogger().info("[Raids] NPCDeathListener registered");
+      }, 20L);
+  }
+  ```
+  
+  <Warning>
+    The Raid module will not function without CustomNPCs. Other modules work independently.
+  </Warning>
+</Accordion>
+
+## Step 4: First Startup
+
+<Steps>
+  <Step title="Start Your Server">
+    Launch your server normally:
+    ```bash
+    java -Xms2G -Xmx4G -jar spigot.jar nogui
+    ```
+  </Step>
+  
+  <Step title="Monitor Console Output">
+    Watch for successful initialization messages:
+    ```
+    [Debentialc] Plugin successfully enabled
+    [Debentialc] Version: 1.1.5
+    [Debentialc] By DelawareX
+    [Debentialc] Sistema de Boosters inicializado correctamente
+    [Debentialc] [Raids] Sistema de raids inicializado
+    ```
+  </Step>
+  
+  <Step title="Verify Directory Structure">
+    The plugin creates its data directory automatically (Main.java:39-43):
+    ```
+    plugins/Debentialc/
+    ├── data/
+    │   ├── boosters/
+    │   │   ├── global_boosters.json
+    │   │   └── personal_boosters.json
+    │   ├── raids/
+    │   │   ├── raids.json
+    │   │   ├── cooldowns.json
+    │   │   └── system_data.json
+    │   ├── claims/
+    │   │   └── terrains.json
+    │   └── customitems/
+    │       └── items.json
+    ```
+  </Step>
+  
+  <Step title="Check Plugin Status">
+    In-game or in console, run:
+    ```bash
+    /plugins
+    ```
+    Debentialc should appear in **green**, indicating it loaded successfully.
+  </Step>
+</Steps>
+
+## Step 5: Verify Installation
+
+<CodeGroup>
+```bash In-Game Commands
+# Test booster commands
+/booster help
+
+# Test custom item commands  
+/ci help
+
+# Test terrain commands
+/terrain list
+
+# Test raid commands (if CustomNPCs is installed)
+/raid list
+```
+
+```bash Console Commands
+# Check loaded classes
+/debentialc debug
+
+# View active modules
+/plugins Debentialc
+```
+</CodeGroup>
+
+### Expected Output
+
+If installation is successful, you should see:
+
+- All four command help menus accessible
+- No errors in console related to Debentialc
+- Data files created in `plugins/Debentialc/data/`
+- Optional plugin hooks logged (PlaceholderAPI, Vault, CustomNPCs)
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Plugin Won't Load">
+    **Symptoms**: Red plugin name in `/plugins`, errors in console
+    
+    **Solutions**:
+    
+    1. **Check Java Version**:
+       ```bash
+       java -version
+       # Must be 1.8 or higher
+       ```
+    
+    2. **Verify Server Type**:
+       - Must be Bukkit/Spigot/Paper
+       - CraftBukkit 1.8+ required
+    
+    3. **Check File Integrity**:
+       - Re-download the plugin
+       - Ensure JAR is not corrupted
+    
+    4. **Review Console Logs**:
+       Look for specific error messages like:
+       - `NoClassDefFoundError` - Missing dependency
+       - `UnsupportedClassVersionError` - Java version too old
+       - `Plugin file does not contain plugin.yml` - Corrupted JAR
+  </Accordion>
+  
+  <Accordion title="PlaceholderAPI Not Detected">
+    **Symptoms**: "PlaceholderAPI not found" message in console
+    
+    **Solutions**:
+    
+    1. Verify PlaceholderAPI is installed:
+       ```bash
+       /plugins
+       # Look for PlaceholderAPI in green
+       ```
+    
+    2. Ensure PlaceholderAPI loads before Debentialc:
+       Add to `bukkit.yml` if needed:
+       ```yaml
+       plugin-profiling: true
+       load-before:
+         - PlaceholderAPI
+       ```
+    
+    3. Restart server (not reload):
+       ```bash
+       stop
+       # Then start server again
+       ```
+  </Accordion>
+  
+  <Accordion title="CustomNPCs Integration Failed">
+    **Symptoms**: "[Raids] CustomNPCs not available" warning
+    
+    **Solutions**:
+    
+    1. Install CustomNPCs properly:
+       - For Forge: Place in `mods/` folder
+       - For SpongeForge: Ensure Sponge bridge is active
+    
+    2. Check CustomNPCs API availability:
+       - Verify `noppes.npcs.api` package exists
+       - May need specific CustomNPCs version
+    
+    3. The raid module requires CustomNPCs API to be fully loaded (Main.java:107-110):
+       ```java
+       if (!noppes.npcs.api.AbstractNpcAPI.IsAvailable()) {
+           getLogger().warning("[Raids] CustomNPCs not available");
+           return;
+       }
+       ```
+  </Accordion>
+  
+  <Accordion title="Data Files Not Created">
+    **Symptoms**: No `plugins/Debentialc/` directory after startup
+    
+    **Solutions**:
+    
+    1. **Check Permissions**:
+       ```bash
+       ls -la plugins/
+       # Ensure server has write permissions
+       ```
+    
+    2. **Verify Directory Creation** (Main.java:39-43):
+       ```java
+       String ruta1 = System.getProperty("user.dir") + File.separator + "plugins";
+       File file = new File(ruta1, "Debentialc");
+       file.mkdir();
+       ```
+    
+    3. **Manual Creation**:
+       ```bash
+       mkdir -p plugins/Debentialc/data/{boosters,raids,claims,customitems}
+       chown -R minecraft:minecraft plugins/Debentialc
+       ```
+  </Accordion>
+  
+  <Accordion title="Commands Not Working">
+    **Symptoms**: "Unknown command" errors
+    
+    **Solutions**:
+    
+    1. **Check Permissions**:
+       Each command requires specific permissions (see Configuration page)
+    
+    2. **Verify Command Registration**:
+       The plugin uses a custom command framework (Main.java:54-58):
+       ```java
+       classesRegistration.loadCommands("org.debentialc.customitems.commands");
+       classesRegistration.loadCommands("org.debentialc.raids.commands");
+       classesRegistration.loadCommands("org.debentialc.boosters.commands");
+       classesRegistration.loadCommands("org.debentialc.claims.commands");
+       ```
+    
+    3. **Try Aliases**:
+       - `/booster` → `/boosters`, `/boost`
+       - `/customitem` → `/ci`
+       - `/terrain` → `/t`
+  </Accordion>
+</AccordionGroup>
+
+## Updating Debentialc
+
+<Warning>
+  Always backup your `plugins/Debentialc/data/` folder before updating!
+</Warning>
+
+<Steps>
+  <Step title="Backup Data">
+    ```bash
+    cp -r plugins/Debentialc/data/ ~/backups/debentialc-data-$(date +%Y%m%d)
+    ```
+  </Step>
+  
+  <Step title="Stop Server">
+    ```bash
+    stop
+    ```
+  </Step>
+  
+  <Step title="Replace JAR">
+    ```bash
+    rm plugins/Debentialc.jar
+    cp ~/downloads/Debentialc-new.jar plugins/Debentialc.jar
+    ```
+  </Step>
+  
+  <Step title="Start Server">
+    The plugin will automatically migrate data if needed.
+  </Step>
+  
+  <Step title="Verify Version">
+    Check console for:
+    ```
+    [Debentialc] Version: 1.1.5
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Configure modules and customize behavior
+  </Card>
+  <Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+    Learn basic commands and workflows
+  </Card>
+</CardGroup>

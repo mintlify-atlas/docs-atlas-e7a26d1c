@@ -1,0 +1,503 @@
+---
+title: Booster Manager API
+description: Complete API reference for managing global and personal boosters in Debentialc
+---
+
+## Overview
+
+The Booster system provides server-wide and player-specific multipliers that can be applied to various game mechanics. The system consists of three main components:
+
+- **GlobalBoosterManager** - Manages server-wide boosters that affect all players
+- **PersonalBoosterManager** - Manages individual player boosters
+- **BoosterUtils** - Utility methods for calculating and formatting booster values
+
+## GlobalBoosterManager
+
+Manages server-wide boosters that apply to all online players. Only one global booster can be active at a time.
+
+### Activating Boosters
+
+#### activateBooster(multiplier, activatedBy)
+
+Activates a global booster with the default duration from settings.
+
+```java
+import org.debentialc.boosters.managers.GlobalBoosterManager;
+
+// Activate a 2x global booster
+GlobalBoosterManager.activateBooster(2.0, "Admin");
+```
+
+<ParamField path="multiplier" type="double" required>
+  The multiplier value (e.g., 2.0 for 2x, 1.5 for 1.5x)
+</ParamField>
+
+<ParamField path="activatedBy" type="String" required>
+  Name of the player or system that activated the booster
+</ParamField>
+
+#### activateBooster(multiplier, activatedBy, durationSeconds)
+
+Activates a global booster with a custom duration.
+
+```java
+// Activate a 3x booster for 1 hour
+GlobalBoosterManager.activateBooster(3.0, "ServerEvent", 3600);
+```
+
+<ParamField path="multiplier" type="double" required>
+  The multiplier value
+</ParamField>
+
+<ParamField path="activatedBy" type="String" required>
+  Name of the activator
+</ParamField>
+
+<ParamField path="durationSeconds" type="long" required>
+  Duration in seconds
+</ParamField>
+
+### Querying Booster State
+
+#### getActiveBooster()
+
+Retrieves the currently active global booster, or null if none is active.
+
+```java
+import org.debentialc.boosters.models.GlobalBooster;
+
+GlobalBooster booster = GlobalBoosterManager.getActiveBooster();
+if (booster != null) {
+    System.out.println("Active: " + booster.getMultiplier() + "x");
+    System.out.println("By: " + booster.getActivatedBy());
+}
+```
+
+<ResponseField name="GlobalBooster" type="GlobalBooster">
+  The active booster object, or null if no booster is active
+</ResponseField>
+
+#### isBoosterActive()
+
+Checks if a global booster is currently active.
+
+```java
+if (GlobalBoosterManager.isBoosterActive()) {
+    player.sendMessage("A global booster is currently active!");
+}
+```
+
+<ResponseField name="active" type="boolean">
+  True if a booster is active, false otherwise
+</ResponseField>
+
+#### getCurrentMultiplier()
+
+Gets the current global multiplier value. Returns 1.0 if no booster is active.
+
+```java
+double multiplier = GlobalBoosterManager.getCurrentMultiplier();
+int reward = (int) (baseReward * multiplier);
+```
+
+<ResponseField name="multiplier" type="double">
+  Current multiplier (1.0 = no boost)
+</ResponseField>
+
+#### getRemainingSeconds()
+
+Gets the remaining time in seconds for the active booster.
+
+```java
+long remaining = GlobalBoosterManager.getRemainingSeconds();
+player.sendMessage("Booster expires in: " + remaining + " seconds");
+```
+
+<ResponseField name="seconds" type="long">
+  Remaining seconds, or 0 if no booster is active
+</ResponseField>
+
+### Managing Boosters
+
+#### deactivateBooster()
+
+Immediately deactivates the current global booster.
+
+```java
+GlobalBoosterManager.deactivateBooster();
+Bukkit.broadcastMessage("Global booster has been deactivated!");
+```
+
+#### updateMultiplier(multiplier)
+
+Updates the multiplier of the currently active booster.
+
+```java
+// Increase the current booster's multiplier
+GlobalBoosterManager.updateMultiplier(5.0);
+```
+
+<ParamField path="multiplier" type="double" required>
+  New multiplier value
+</ParamField>
+
+<Note>
+  This only works if a booster is currently active. It does not extend the duration.
+</Note>
+
+#### updateDuration(seconds)
+
+Updates the default duration for future global boosters in settings.
+
+```java
+// Set default duration to 2 hours
+GlobalBoosterManager.updateDuration(7200);
+```
+
+#### checkExpiration()
+
+Manually checks and removes expired boosters. This is called automatically by the plugin.
+
+```java
+GlobalBoosterManager.checkExpiration();
+```
+
+#### restoreBooster(savedBooster)
+
+Restores a previously saved booster (used for persistence).
+
+```java
+GlobalBooster saved = loadFromDatabase();
+GlobalBoosterManager.restoreBooster(saved);
+```
+
+## PersonalBoosterManager
+
+Manages individual player boosters. Each player can have multiple boosters in their inventory but only one active at a time.
+
+### Managing Player Boosters
+
+#### addBooster(booster)
+
+Adds a booster to a player's inventory.
+
+```java
+import org.debentialc.boosters.models.PersonalBooster;
+import java.util.UUID;
+
+UUID playerId = player.getUniqueId();
+PersonalBooster booster = new PersonalBooster(playerId, 3, 2.5);
+PersonalBoosterManager.addBooster(booster);
+```
+
+<ParamField path="booster" type="PersonalBooster" required>
+  The booster object to add
+</ParamField>
+
+#### activateBooster(playerId, index)
+
+Activates a booster from the player's inventory by index.
+
+```java
+UUID playerId = player.getUniqueId();
+int boosterIndex = 0; // First booster in inventory
+PersonalBoosterManager.activateBooster(playerId, boosterIndex);
+```
+
+<ParamField path="playerId" type="UUID" required>
+  Player's unique ID
+</ParamField>
+
+<ParamField path="index" type="int" required>
+  Zero-based index of the booster to activate
+</ParamField>
+
+### Querying Player Boosters
+
+#### getActiveBooster(playerId)
+
+Gets the player's currently active booster.
+
+```java
+PersonalBooster active = PersonalBoosterManager.getActiveBooster(player.getUniqueId());
+if (active != null) {
+    player.sendMessage("Your " + active.getLevelName() + " booster is active!");
+}
+```
+
+<ResponseField name="PersonalBooster" type="PersonalBooster">
+  The active booster, or null if none is active
+</ResponseField>
+
+#### getPlayerBoosters(playerId)
+
+Gets all boosters in a player's inventory.
+
+```java
+import java.util.List;
+
+List<PersonalBooster> boosters = PersonalBoosterManager.getPlayerBoosters(player.getUniqueId());
+player.sendMessage("You have " + boosters.size() + " boosters");
+```
+
+<ResponseField name="boosters" type="List<PersonalBooster>">
+  List of all boosters owned by the player
+</ResponseField>
+
+#### getActiveMultiplier(playerId)
+
+Gets the player's current personal multiplier.
+
+```java
+double multiplier = PersonalBoosterManager.getActiveMultiplier(player.getUniqueId());
+int reward = (int) (baseReward * multiplier);
+```
+
+<ResponseField name="multiplier" type="double">
+  Current personal multiplier (1.0 if no booster active)
+</ResponseField>
+
+### Maintenance Operations
+
+#### deactivateBooster(playerId)
+
+Deactivates the player's current booster.
+
+```java
+PersonalBoosterManager.deactivateBooster(player.getUniqueId());
+```
+
+#### removeExpiredBoosters(playerId)
+
+Removes expired boosters from a player's inventory based on storage duration.
+
+```java
+PersonalBoosterManager.removeExpiredBoosters(player.getUniqueId());
+```
+
+#### clearBoosters(playerId)
+
+Removes all boosters from a player's inventory.
+
+```java
+PersonalBoosterManager.clearBoosters(player.getUniqueId());
+```
+
+#### clearAllBoosters()
+
+Clears all boosters from all players (admin operation).
+
+```java
+PersonalBoosterManager.clearAllBoosters();
+```
+
+## BoosterUtils
+
+Utility class for common booster operations and formatting.
+
+### Calculations
+
+#### calculateCombinedMultiplier(playerId)
+
+Calculates the combined multiplier from global and personal boosters.
+
+```java
+import org.debentialc.boosters.core.BoosterUtils;
+
+double combined = BoosterUtils.calculateCombinedMultiplier(player.getUniqueId());
+int finalReward = (int) (baseReward * combined);
+```
+
+<ResponseField name="multiplier" type="double">
+  Combined multiplier (global × personal)
+</ResponseField>
+
+<Tip>
+  This is the most common method to use when applying boosters to gameplay rewards.
+</Tip>
+
+#### getPercentageBonus(multiplier)
+
+Converts a multiplier to a percentage bonus.
+
+```java
+int bonus = BoosterUtils.getPercentageBonus(2.5); // Returns 150
+player.sendMessage("Bonus: +" + bonus + "%");
+```
+
+#### isMultiplierValid(multiplier)
+
+Validates if a multiplier value is within acceptable range (0 < x < 1000).
+
+```java
+if (BoosterUtils.isMultiplierValid(userInput)) {
+    GlobalBoosterManager.activateBooster(userInput, "Admin");
+} else {
+    player.sendMessage("Invalid multiplier value!");
+}
+```
+
+### Formatting
+
+#### formatMultiplier(multiplier)
+
+Formats a multiplier as a string with 2 decimal places.
+
+```java
+String formatted = BoosterUtils.formatMultiplier(2.5); // "2.50x"
+```
+
+#### formatPercentage(multiplier)
+
+Formats a multiplier as a colored percentage bonus.
+
+```java
+String formatted = BoosterUtils.formatPercentage(1.5); // "§a+50%"
+String formatted2 = BoosterUtils.formatPercentage(1.0); // "§60%"
+```
+
+#### formatTime(seconds)
+
+Formats seconds into a human-readable time string.
+
+```java
+String time = BoosterUtils.formatTime(3665); // "§61h 1m 5s"
+player.sendMessage("Remaining: " + time);
+```
+
+### Cleanup
+
+#### cleanupExpiredBoosters(playerId)
+
+Removes expired boosters for a specific player.
+
+```java
+BoosterUtils.cleanupExpiredBoosters(player.getUniqueId());
+```
+
+#### cleanupAllExpiredBoosters()
+
+Cleans up expired global boosters.
+
+```java
+BoosterUtils.cleanupAllExpiredBoosters();
+```
+
+## Complete Example
+
+Here's a complete example showing how to integrate the booster system into a reward mechanism:
+
+```java
+import org.bukkit.entity.Player;
+import org.debentialc.boosters.core.BoosterUtils;
+import org.debentialc.boosters.managers.GlobalBoosterManager;
+import org.debentialc.boosters.managers.PersonalBoosterManager;
+
+public class RewardManager {
+    
+    public void giveReward(Player player, int baseAmount) {
+        // Get combined multiplier
+        double multiplier = BoosterUtils.calculateCombinedMultiplier(player.getUniqueId());
+        
+        // Calculate final reward
+        int finalAmount = (int) (baseAmount * multiplier);
+        
+        // Give reward to player
+        giveCoins(player, finalAmount);
+        
+        // Notify player
+        if (multiplier > 1.0) {
+            String bonus = BoosterUtils.formatPercentage(multiplier);
+            player.sendMessage("§aReward: §f" + finalAmount + " coins " + bonus);
+        } else {
+            player.sendMessage("§aReward: §f" + finalAmount + " coins");
+        }
+    }
+    
+    public void displayBoosterStatus(Player player) {
+        // Check global booster
+        if (GlobalBoosterManager.isBoosterActive()) {
+            double globalMult = GlobalBoosterManager.getCurrentMultiplier();
+            long remaining = GlobalBoosterManager.getRemainingSeconds();
+            String time = BoosterUtils.formatTime(remaining);
+            player.sendMessage("§6Global Booster: §f" + globalMult + "x §7(" + time + ")");
+        }
+        
+        // Check personal booster
+        if (PersonalBoosterManager.getActiveBooster(player.getUniqueId()) != null) {
+            double personalMult = PersonalBoosterManager.getActiveMultiplier(player.getUniqueId());
+            player.sendMessage("§6Personal Booster: §f" + personalMult + "x");
+        }
+        
+        // Show combined multiplier
+        double combined = BoosterUtils.calculateCombinedMultiplier(player.getUniqueId());
+        if (combined > 1.0) {
+            player.sendMessage("§6Combined: §f" + BoosterUtils.formatMultiplier(combined));
+        }
+    }
+}
+```
+
+## Data Models
+
+### GlobalBooster
+
+<ResponseField name="multiplier" type="double">
+  The multiplier value (e.g., 2.0 for 2x boost)
+</ResponseField>
+
+<ResponseField name="startTime" type="Instant">
+  When the booster was activated
+</ResponseField>
+
+<ResponseField name="endTime" type="Instant">
+  When the booster expires
+</ResponseField>
+
+<ResponseField name="activatedBy" type="String">
+  Name of who activated the booster
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether the booster is currently active
+</ResponseField>
+
+### PersonalBooster
+
+<ResponseField name="playerId" type="UUID">
+  Owner of the booster
+</ResponseField>
+
+<ResponseField name="level" type="int">
+  Booster level (1-5)
+</ResponseField>
+
+<ResponseField name="multiplier" type="double">
+  The multiplier value
+</ResponseField>
+
+<ResponseField name="activationTime" type="Instant">
+  When the booster was activated
+</ResponseField>
+
+<ResponseField name="creationTime" type="Instant">
+  When the booster was created/obtained
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether currently active
+</ResponseField>
+
+## Best Practices
+
+<Tip>
+  **Thread Safety**: All managers use thread-safe data structures and can be safely accessed from async tasks.
+</Tip>
+
+<Note>
+  **Persistence**: Boosters are automatically saved and loaded by the plugin. Manual persistence is only needed for custom implementations.
+</Note>
+
+<Warning>
+  **Multiplier Stacking**: Global and personal boosters multiply together. A 2x global + 2x personal = 4x total multiplier.
+</Warning>

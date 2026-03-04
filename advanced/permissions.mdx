@@ -1,0 +1,336 @@
+---
+title: 'Permissions Reference'
+description: 'Complete permission nodes for Debentialc plugin commands and features'
+---
+
+## Overview
+
+Debentialc uses a permission-based system to control access to commands and features across all modules. All permission nodes follow a consistent structure for easy management.
+
+## Base Permissions
+
+The plugin uses two primary permission prefixes:
+
+- `debentialc.command.*` - Command execution permissions
+- `debentialc.action.*` - Action and feature permissions
+- `claims.command.*` - Claims module commands
+- `claims.admin.*` - Claims administration
+- `dbcplugin.raids.admin` - Raids administration
+
+## Booster System Permissions
+
+### Command Permissions
+
+<AccordionGroup>
+  <Accordion title="Booster Management">
+    ```yaml
+    debentialc.command.booster
+    ```
+    
+    **Description**: Access to the main `/booster` command and all subcommands.
+    
+    **Grants access to**:
+    - `/booster global activate <percentage> [time]` - Activate global booster
+    - `/booster global deactivate` - Deactivate global booster
+    - `/booster global info` - View global booster information
+    - `/booster personal add <player> <level>` - Give personal booster to player
+    - `/booster personal activate <index>` - Activate personal booster
+    - `/booster personal list` - List player's personal boosters
+    - `/booster info` - View all active boosters
+    - `/booster save` - Save booster data
+    - `/booster load` - Load booster data
+    
+    **Usage example**:
+    ```yaml
+    # LuckPerms
+    lp group admin permission set debentialc.command.booster true
+    
+    # PermissionsEx
+    pex group admin add debentialc.command.booster
+    ```
+  </Accordion>
+
+  <Accordion title="TP Booster Commands">
+    ```yaml
+    debentialc.command.tpbooster
+    ```
+    
+    **Description**: Access to TP (Transformation Points) booster commands.
+    
+    **Grants access to**:
+    - `/tpbooster give <amount>` - Give TPs with booster applied
+    - `/tpbooster test` - Test booster calculations
+    - `/tpbooster info` - View active TP booster multipliers
+    - `/tpbooster calculate <amount>` - Calculate boosted TP amount
+    
+    **Usage example**:
+    ```yaml
+    # Grant to moderators
+    lp group mod permission set debentialc.command.tpbooster true
+    ```
+  </Accordion>
+
+  <Accordion title="Give TPs Command">
+    ```yaml
+    debentialc.dartps
+    ```
+    
+    **Description**: Administrative command to give TPs to players.
+    
+    **Command**: `/dartps <player> <amount>`
+    
+    **Usage example**:
+    ```yaml
+    lp group admin permission set debentialc.dartps true
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Claims System Permissions
+
+### Terrain Commands
+
+<AccordionGroup>
+  <Accordion title="Basic Terrain Permissions">
+    ```yaml
+    claims.command.terrain.info      # View terrain information
+    claims.command.terrain.create    # Create new terrains (admin)
+    claims.command.terrain.price     # Set terrain price (admin)
+    claims.command.terrain.commit    # Generate terrain at location (admin)
+    ```
+    
+    **Commands**:
+    - `/terrain info [id]` - View terrain information
+    - `/terrain create <id> <chunks>` - Create new terrain
+    - `/terrain price <id> <price>` - Set terrain price
+    - `/terrain commit <id>` - Generate terrain at current location
+    - `/terrain list` - List all terrains
+  </Accordion>
+
+  <Accordion title="Terrain Management">
+    ```yaml
+    claims.command.terrain.member    # Add members to terrain
+    claims.command.terrain.kick      # Remove members from terrain
+    claims.command.terrain.transfer  # Transfer terrain ownership
+    claims.command.terrain.sell      # Sell terrain back
+    ```
+    
+    **Member roles**: `BUILD`, `BREAK`, `CONTAINERS`, `ALL`
+    
+    **Commands**:
+    - `/terrain member <id> <player> <role>` - Add member with permissions
+    - `/terrain kick <id> <player>` - Remove member
+    - `/terrain transfer <id> <player>` - Transfer ownership
+    - `/terrain sell <id>` - Sell terrain (50% refund)
+  </Accordion>
+
+  <Accordion title="Administrative Terrain Permissions">
+    ```yaml
+    claims.command.terrain.delete    # Delete terrain permanently
+    claims.command.terrain.dissolve  # Remove ownership without deleting
+    claims.admin.bypass              # Bypass terrain protections
+    claims.admin.manage              # Manage all terrains
+    ```
+    
+    **Commands**:
+    - `/terrain delete <id>` - Permanently delete terrain
+    - `/terrain dissolve <id>` - Reset terrain to for-sale status
+  </Accordion>
+
+  <Accordion title="Terrain Customization">
+    ```yaml
+    claims.command.terrain.customize         # Base customization access
+    claims.command.terrain.customize.biome   # Change terrain biome
+    claims.command.terrain.customize.floor   # Change terrain floor blocks
+    claims.command.terrain.customize.weather # Control terrain weather
+    claims.command.terrain.customize.rules   # Set game rules
+    claims.command.terrain.customize.time    # Set time of day
+    claims.command.terrain.customize.effects # Apply potion effects
+    ```
+    
+    **Description**: Allows terrain owners to customize environmental settings.
+  </Accordion>
+</AccordionGroup>
+
+### Lease System
+
+```yaml
+claims.command.terrain.info  # Required for lease commands
+```
+
+**Commands**:
+- `/lease offer <terrain-id> <player> <price> <duration>`
+- `/lease accept` / `/lease deny`
+- `/lease list` - View active leases
+- `/lease cancel <lease-id>`
+
+## Raids System Permissions
+
+<AccordionGroup>
+  <Accordion title="Raid Administration">
+    ```yaml
+    dbcplugin.raids.admin
+    ```
+    
+    **Description**: Full access to raid system management.
+    
+    **Grants access to**:
+    - `/raid` - Open raid configuration menu
+    - `/raid create` - Create new raid
+    - `/raid list` - View all raids
+    - `/raid menu` - Open main menu
+    - `/raid info` - View system information
+    - `/raid reload` - Reload raid data
+    - `/raid save` - Save all raid data
+    
+    **Usage example**:
+    ```yaml
+    lp group admin permission set dbcplugin.raids.admin true
+    ```
+  </Accordion>
+
+  <Accordion title="Party Commands">
+    **No specific permission required** - All players can use party commands.
+    
+    **Available commands**:
+    - `/party create` - Create a party
+    - `/party invite <player>` - Invite player to party
+    - `/party accept` - Accept party invitation
+    - `/party deny` - Decline invitation
+    - `/party leave` - Leave current party
+    - `/party start <raid>` - Start raid (leader only)
+    - `/party info` - View party information
+    - `/party members` - List party members
+    - `/party disband` - Dissolve party (leader only)
+  </Accordion>
+</AccordionGroup>
+
+## Custom Items Permissions
+
+<AccordionGroup>
+  <Accordion title="Custom Item Management">
+    ```yaml
+    debentialc.command.ci            # Custom item commands
+    debentialc.command.menu          # Access menus
+    debentialc.command.fragment      # Fragment system
+    debentialc.command.fragmentadmin # Fragment administration
+    debentialc.command.scriptadmin   # Script management
+    ```
+    
+    **Commands**:
+    - `/customitem` or `/ci` - Custom item management
+    - `/cimenu` or `/cim` - Open custom item menu
+    - `/camenu` or `/cam` - Open custom armor menu
+    - `/fragment` or `/frag` - Fragment commands
+    - `/fragmentadmin` or `/fadmin` - Admin fragment tools
+    - `/fragmenttier` or `/ftier` - Manage fragment tiers
+    - `/scriptadmin` or `/sadmin` - Script administration
+  </Accordion>
+</AccordionGroup>
+
+## Permission Setup Examples
+
+### Administrator Setup
+
+```yaml
+# Full administrative access
+groups:
+  admin:
+    permissions:
+      - debentialc.command.*
+      - debentialc.action.*
+      - claims.admin.*
+      - claims.command.*
+      - dbcplugin.raids.admin
+```
+
+### Moderator Setup
+
+```yaml
+# Limited administrative access
+groups:
+  moderator:
+    permissions:
+      - debentialc.command.booster
+      - debentialc.command.tpbooster
+      - debentialc.dartps
+      - claims.command.terrain.info
+      - claims.command.terrain.member
+```
+
+### VIP Setup
+
+```yaml
+# Enhanced player access
+groups:
+  vip:
+    permissions:
+      - debentialc.command.booster  # View boosters only
+      - claims.command.terrain.info
+      - claims.command.terrain.customize
+      - claims.command.terrain.customize.biome
+      - claims.command.terrain.customize.weather
+```
+
+### Default Player
+
+```yaml
+# Basic player access
+groups:
+  default:
+    permissions:
+      - claims.command.terrain.info
+      # Party commands require no permissions
+```
+
+## Wildcard Permissions
+
+<Warning>
+  Use wildcards carefully as they grant broad permissions.
+</Warning>
+
+```yaml
+debentialc.*              # All Debentialc permissions
+debentialc.command.*      # All command permissions
+claims.*                  # All claims permissions
+claims.command.*          # All claims commands
+claims.command.terrain.*  # All terrain commands
+```
+
+## Permission Inheritance
+
+<Tip>
+  Some permissions inherit from parent nodes. For example, `claims.admin.manage` grants the ability to perform owner-level actions on any terrain without needing specific command permissions.
+</Tip>
+
+## Troubleshooting Permissions
+
+<AccordionGroup>
+  <Accordion title="Player can't use commands">
+    1. Check permission node spelling (case-sensitive)
+    2. Verify permission plugin is loaded
+    3. Use `/lp user <player> permission check <node>` to test
+    4. Check for permission negations (`-permission`)
+  </Accordion>
+
+  <Accordion title="Admin can't manage terrains">
+    Ensure both permissions are granted:
+    - `claims.admin.manage` (for bypass)
+    - `claims.command.terrain.*` (for commands)
+  </Accordion>
+
+  <Accordion title="Booster commands not working">
+    The permission follows the format:
+    ```yaml
+    debentialc.command.booster
+    ```
+    
+    Do NOT use: `debentialc.command.boosters` (plural)
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [Configuration Guide](/configuration) - Configure permission requirements
+- [Commands Reference](/api/commands/booster) - Full command list
+- [Troubleshooting](/advanced/troubleshooting) - Common permission issues

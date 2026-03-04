@@ -1,0 +1,667 @@
+---
+title: 'Territory Management System'
+description: 'Complete guide to creating, managing, and customizing territories with leases, permissions, and environmental effects'
+---
+
+The Debentialc territory system (also called Claims/Terrains) allows players to own protected land areas with customizable environments, member permissions, and even lease sub-territories to other players.
+
+## Overview
+
+The territory system provides:
+- **Protected land claims** with configurable sizes
+- **Ownership and permissions** for building, breaking, containers
+- **Environmental customization** (biomes, weather, time, effects)
+- **Lease system** for sub-letting portions of your territory
+- **Economy integration** for buying/selling territories
+- **Visual boundaries** with automatic border generation
+
+## Territory Basics
+
+### Creating a Territory
+
+<Steps>
+  <Step title="Create the territory definition">
+    ```bash
+    /terrain create <id> <chunks>
+    ```
+    
+    Example:
+    ```bash
+    /terrain create my_base 4
+    ```
+    
+    This creates a 4-chunk (64x64 blocks) territory with ID `my_base`.
+  </Step>
+  
+  <Step title="Set the price">
+    ```bash
+    /terrain price my_base 10000
+    ```
+    
+    Sets the purchase price to $10,000 (requires Vault economy).
+  </Step>
+  
+  <Step title="Generate the territory">
+    Stand where you want the territory origin (corner) to be:
+    
+    ```bash
+    /terrain commit my_base
+    ```
+    
+    This generates:
+    - Territory boundaries in the world
+    - A sign showing territory info
+    - Protection for the area
+  </Step>
+</Steps>
+
+### Territory Model
+
+From the source code:
+
+```java Terrain.java:11-106
+public class Terrain {
+
+    public enum MemberRole {
+        BUILD, BREAK, CONTAINERS, ALL
+    }
+
+    private String id;
+    private int chunks;
+    private double price;
+    private UUID owner;
+    private String ownerName;
+    private Location origin;
+    private boolean committed;
+    private Map<UUID, List<MemberRole>> members;
+
+    public Terrain(String id, int chunks) {
+        this.id = id;
+        this.chunks = chunks;
+        this.price = 0;
+        this.owner = null;
+        this.ownerName = null;
+        this.origin = null;
+        this.committed = false;
+        this.members = new HashMap<UUID, List<MemberRole>>();
+    }
+
+    public int getSizeInBlocks() {
+        return chunks * 16;
+    }
+
+    public boolean isInsideTerrain(Location loc) {
+        if (origin == null) return false;
+        if (!loc.getWorld().getName().equals(origin.getWorld().getName())) return false;
+        int ox = origin.getBlockX();
+        int oz = origin.getBlockZ();
+        int size = getSizeInBlocks();
+        int x = loc.getBlockX();
+        int z = loc.getBlockZ();
+        return x >= ox && x < ox + size && z >= oz && z < oz + size;
+    }
+}
+```
+
+### Chunk Sizes
+
+Territories are measured in chunks (16x16 blocks):
+
+| Chunks | Block Size | Total Area |
+|--------|-----------|------------|
+| 1 | 16x16 | 256 blocks |
+| 2 | 32x32 | 1,024 blocks |
+| 4 | 64x64 | 4,096 blocks |
+| 8 | 128x128 | 16,384 blocks |
+| 16 | 256x256 | 65,536 blocks |
+
+## Ownership and Permissions
+
+### Buying a Territory
+
+Players can purchase territories that are for sale:
+
+1. Find a territory with a sign
+2. Right-click the sign
+3. Confirm purchase (money is deducted)
+
+Or use the territory menu:
+```bash
+/territorymenu
+```
+
+### Managing Members
+
+As a territory owner, you can grant permissions to other players:
+
+```bash
+/terrain member <terrain_id> <player> <role>
+```
+
+<CodeGroup>
+```bash Building Permission
+/terrain member my_base Steve build
+# Allows Steve to place blocks
+```
+
+```bash Breaking Permission
+/terrain member my_base Steve break
+# Allows Steve to break blocks
+```
+
+```bash Container Access
+/terrain member my_base Steve containers
+# Allows Steve to open chests, furnaces, etc.
+```
+
+```bash Full Access
+/terrain member my_base Steve all
+# Grants all permissions
+```
+</CodeGroup>
+
+### Removing Members
+
+```bash
+/terrain kick <terrain_id> <player>
+```
+
+### Transferring Ownership
+
+```bash
+/terrain transfer <terrain_id> <new_owner>
+```
+
+<Warning>
+  Transferring ownership gives complete control to the new owner. You cannot undo this without admin intervention.
+</Warning>
+
+## Environmental Customization
+
+Territories can have custom environments that override world settings.
+
+### Setting Biome
+
+```bash
+# Available via territory customization menu
+# Select terrain -> Customize -> Biome
+```
+
+From the source code:
+
+```java TerrainCustomizeManager.java:66-103
+public static boolean setBiome(final Terrain terrain, final Player player, final String biomeName) {
+    final Biome biome;
+    try {
+        biome = Biome.valueOf(biomeName.toUpperCase());
+    } catch (IllegalArgumentException e) {
+        player.sendMessage(CC.translate("&cBioma desconocido: &f" + biomeName));
+        return false;
+    }
+
+    if (!hasOrigin(terrain, player)) return false;
+
+    final World world = terrain.getOrigin().getWorld();
+    final int ox   = terrain.getOrigin().getBlockX();
+    final int oz   = terrain.getOrigin().getBlockZ();
+    final int size = terrain.getSizeInBlocks();
+    final String tid = terrain.getId();
+
+    Bukkit.getScheduler().runTaskAsynchronously(Main.instance, new Runnable() {
+        public void run() {
+            for (int x = ox; x < ox + size; x++) {
+                for (int z = oz; z < oz + size; z++) {
+                    world.setBiome(x, z, biome);
+                }
+            }
+            Bukkit.getScheduler().runTask(Main.instance, new Runnable() {
+                public void run() {
+                    for (int cx = ox >> 4; cx <= (ox + size) >> 4; cx++) {
+                        for (int cz = oz >> 4; cz <= (oz + size) >> 4; cz++) {
+                            world.refreshChunk(cx, cz);
+                        }
+                    }
+                    player.sendMessage(CC.translate("&7Bioma del terreno &f" + tid + " &7cambiado a &f" + biomeName + "&7."));
+                }
+            });
+        }
+    });
+    return true;
+}
+```
+
+### Setting Time
+
+Players inside the territory see custom time:
+
+```java TerrainCustomizeManager.java:185-211
+public static void setTime(Terrain terrain, Player player, long ticks) {
+    terrainTime.put(terrain.getId(), ticks);
+    if (storage != null) storage.setTime(terrain.getId(), ticks);
+    player.setPlayerTime(ticks, false);
+    player.sendMessage(CC.translate("&7Tiempo del terreno configurado."));
+}
+
+public static void applyTimeToPlayer(Player player) {
+    Terrain terrain = TerrainManager.getInstance().getTerrainAt(player.getLocation());
+    if (terrain != null) {
+        Long cachedTicks = terrainTime.get(terrain.getId());
+        if (cachedTicks == null && storage != null) {
+            long diskTicks = storage.getTime(terrain.getId());
+            if (diskTicks >= 0) {
+                terrainTime.put(terrain.getId(), diskTicks);
+                cachedTicks = diskTicks;
+            }
+        }
+        if (cachedTicks != null && cachedTicks >= 0) {
+            player.setPlayerTime(cachedTicks, false);
+            return;
+        }
+    }
+    if (!player.isPlayerTimeRelative()) {
+        player.resetPlayerTime();
+    }
+}
+```
+
+Time values:
+- `0` - Sunrise (6:00 AM)
+- `6000` - Noon (12:00 PM)
+- `12000` - Sunset (6:00 PM)
+- `18000` - Midnight (12:00 AM)
+
+### Setting Weather
+
+Control weather in your territory:
+
+```java TerrainCustomizeManager.java:135-156
+public static void setWeather(Terrain terrain, Player player, String type) {
+    if (!hasOrigin(terrain, player)) return;
+
+    World world = terrain.getOrigin().getWorld();
+    terrainWeather.put(terrain.getId(), type);
+    if (storage != null) storage.setWeather(terrain.getId(), type);
+
+    if ("CLEAR".equals(type)) {
+        world.setStorm(false);
+        world.setThundering(false);
+        world.setWeatherDuration(Integer.MAX_VALUE);
+    } else if ("RAIN".equals(type)) {
+        world.setStorm(true);
+        world.setThundering(false);
+        world.setWeatherDuration(Integer.MAX_VALUE);
+    } else if ("STORM".equals(type)) {
+        world.setStorm(true);
+        world.setThundering(true);
+        world.setThunderDuration(Integer.MAX_VALUE);
+        world.setWeatherDuration(Integer.MAX_VALUE);
+    }
+}
+```
+
+Options: `CLEAR`, `RAIN`, `STORM`
+
+### Applying Environmental Effects
+
+Terrains can grant potion effects to players inside:
+
+```java TerrainCustomizeManager.java:220-247
+public static void setEffect(Terrain terrain, Player player, String effectName) {
+    terrainEffects.put(terrain.getId(), effectName);
+    if (storage != null) storage.setEffect(terrain.getId(), effectName);
+    if ("NONE".equals(effectName)) {
+        player.sendMessage(CC.translate("&7Efecto ambiental desactivado."));
+    } else {
+        player.sendMessage(CC.translate("&7Efecto ambiental configurado."));
+    }
+}
+
+public static void applyEffectToPlayer(Player player) {
+    Terrain terrain = TerrainManager.getInstance().getTerrainAt(player.getLocation());
+    if (terrain == null) return;
+
+    String effectName = getEffect(terrain);
+    if ("NONE".equals(effectName) || effectName.isEmpty()) return;
+
+    PotionEffectType pet = getPotionEffectType(effectName);
+    if (pet == null) return;
+
+    PotionEffect existing = null;
+    for (PotionEffect pe : player.getActivePotionEffects()) {
+        if (pe.getType().equals(pet)) { existing = pe; break; }
+    }
+    if (existing != null && existing.getDuration() > 100) return;
+
+    player.addPotionEffect(new PotionEffect(pet, 300, 0, true), true);
+}
+```
+
+Available effects:
+- `REGENERATION` - Health regeneration
+- `SPEED` - Movement speed boost
+- `INCREASE_DAMAGE` - Strength boost
+- `WATER_BREATHING` - Breathe underwater
+- `NIGHT_VISION` - See in the dark
+- `INVISIBILITY` - Turn invisible
+- `SLOW` - Slowness debuff
+
+<Tip>
+  Effects are applied automatically to players every 9 seconds (180 ticks) when they're in the territory.
+</Tip>
+
+### Game Rules
+
+Customize game rules per territory:
+
+```java TerrainCustomizeManager.java:31-41
+private static final Map<String, Boolean> RULE_DEFAULTS = new HashMap<String, Boolean>();
+static {
+    RULE_DEFAULTS.put("pvp",            true);
+    RULE_DEFAULTS.put("mobGriefing",    true);
+    RULE_DEFAULTS.put("keepInventory",  false);
+    RULE_DEFAULTS.put("doFireTick",     true);
+    RULE_DEFAULTS.put("tntExplodes",    true);
+    RULE_DEFAULTS.put("doMobSpawning",  true);
+    RULE_DEFAULTS.put("naturalRegen",   true);
+    RULE_DEFAULTS.put("doHunger",       true);
+}
+```
+
+Toggle rules via the territory menu or programmatically:
+
+```java
+TerrainCustomizeManager.toggleRule(terrain, player, "pvp");
+TerrainCustomizeManager.toggleRule(terrain, player, "keepInventory");
+```
+
+## Lease System
+
+Owners can lease portions of their territory to other players.
+
+### How Leasing Works
+
+1. **Owner offers lease** to a player
+2. **Tenant accepts** the lease offer
+3. **Owner assigns sub-territory** by selecting area
+4. **Tenant pays rent** on a cycle (e.g., every 7 days)
+5. **Lease continues** until cancelled or tenant fails to pay
+
+### Creating a Lease Offer
+
+```bash
+/lease offer <terrain_id> <player> <chunks> <price> <days>
+```
+
+Example:
+```bash
+/lease offer my_base Steve 2 500 7
+```
+
+This offers Steve:
+- 2 chunks (32x32 blocks) of `my_base`
+- For $500 every 7 days
+
+### Accepting a Lease
+
+Player receives notification and accepts:
+
+```bash
+/lease accept <owner_name>
+```
+
+### Assigning the Sub-Territory
+
+Owner must select the area to lease:
+
+```bash
+/lease assign <tenant_name>
+```
+
+This enters **selection mode**:
+1. Left-click to set first corner
+2. Right-click to set second corner
+3. Confirm the selection
+
+<Warning>
+  Sub-territories must:
+  - Be within parent territory boundaries
+  - Not overlap with other sub-territories
+  - Match the chunk size specified in the lease
+</Warning>
+
+### Lease Payment System
+
+From the lease command:
+
+```java LeaseCommand.java:315-322
+private void handlePay(Player player, CommandArgs command) {
+    if (command.length() < 2) { player.sendMessage(CC.translate("&7Uso: &f/lease pay <contractId>")); return; }
+    LeaseContract contract = LeaseManager.getInstance().getContract(command.getArgs(1));
+    if (contract == null) { player.sendMessage(CC.translate("&7Contrato no encontrado.")); return; }
+    if (!contract.getTenantId().equals(player.getUniqueId())) { player.sendMessage(CC.translate("&7No es tu contrato.")); return; }
+    boolean paid = LeaseManager.getInstance().tryPayGrace(command.getArgs(1));
+    player.sendMessage(paid ? CC.translate("&7Pago realizado. Contrato reactivado.") : CC.translate("&7Sin fondos. Necesitas &f$" + (int) contract.getPricePerCycle() + "&7."));
+}
+```
+
+Payment cycles:
+- Automatic withdrawal on cycle day
+- **Grace period** if payment fails
+- **Eviction** if grace period expires without payment
+
+### Managing Leases
+
+<CodeGroup>
+```bash List Leases
+/lease list
+# Shows all leases as owner and tenant
+```
+
+```bash Lease Info
+/lease info <contract_id>
+# Shows detailed contract information
+```
+
+```bash Move Sub-Territory
+/lease move <tenant_name>
+# Relocate the leased area
+```
+
+```bash Evict Tenant (Admin)
+/lease evict <contract_id>
+# Force eviction
+```
+</CodeGroup>
+
+### Lease Contract Statuses
+
+| Status | Description |
+|--------|-------------|
+| `PENDING_OWNER` | Waiting for owner to accept |
+| `PENDING_TENANT` | Waiting for tenant to accept |
+| `AWAITING_SUBTERRAIN` | Waiting for owner to assign area |
+| `ACTIVE` | Lease is active and rent is current |
+| `GRACE_PERIOD` | Payment failed, in grace period |
+| `EXPIRED` | Lease has ended |
+| `CANCELLED` | Lease was cancelled |
+
+## Territory Commands Reference
+
+### Admin Commands
+
+| Command | Description |
+|---------|-------------|
+| `/terrain create <id> <chunks>` | Create new territory |
+| `/terrain price <id> <amount>` | Set purchase price |
+| `/terrain commit <id>` | Generate territory at location |
+| `/terrain delete <id>` | Delete territory |
+| `/terrain dissolve <id>` | Remove owner, set back for sale |
+| `/terrain list` | List all territories |
+
+### Owner Commands
+
+| Command | Description |
+|---------|-------------|
+| `/terrain info [id]` | View territory info |
+| `/terrain member <id> <player> <role>` | Add member |
+| `/terrain kick <id> <player>` | Remove member |
+| `/terrain transfer <id> <player>` | Transfer ownership |
+| `/terrain sell <id>` | Put territory up for sale |
+
+### Lease Commands
+
+| Command | Description |
+|---------|-------------|
+| `/lease` | Open lease menu |
+| `/lease offer <terrain> <player> <chunks> <price> <days>` | Offer lease |
+| `/lease request <terrain> <chunks> <price> <days> <owner>` | Request lease |
+| `/lease accept <player>` | Accept lease offer |
+| `/lease assign <tenant>` | Assign sub-territory area |
+| `/lease pay <contract_id>` | Pay rent manually |
+| `/lease list` | View all leases |
+| `/lease info <contract_id>` | View lease details |
+
+## Complete Territory Setup Example
+
+<Steps>
+  <Step title="Create and configure">
+    ```bash
+    /terrain create dragon_keep 8
+    /terrain price dragon_keep 50000
+    ```
+  </Step>
+  
+  <Step title="Generate in world">
+    Stand at desired location:
+    ```bash
+    /terrain commit dragon_keep
+    ```
+  </Step>
+  
+  <Step title="Customize environment">
+    Open territory menu: `/territorymenu`
+    
+    - Biome: EXTREME_HILLS
+    - Time: 18000 (always night)
+    - Weather: CLEAR
+    - Effect: NIGHT_VISION
+    - Toggle PvP: OFF
+    - Toggle keepInventory: ON
+  </Step>
+  
+  <Step title="Add trusted members">
+    ```bash
+    /terrain member dragon_keep Alice all
+    /terrain member dragon_keep Bob build
+    ```
+  </Step>
+  
+  <Step title="Lease a section">
+    ```bash
+    # Offer 2 chunks to Charlie for $1000/week
+    /lease offer dragon_keep Charlie 2 1000 7
+    
+    # After Charlie accepts:
+    /lease assign Charlie
+    # Select the area with clicks
+    ```
+  </Step>
+</Steps>
+
+## Territory Task System
+
+Effects and time are applied automatically via scheduled tasks:
+
+```java Main.java:84-100
+private void startTerrainEffectsTask() {
+    new BukkitRunnable() {
+        @Override
+        public void run() {
+            for (Player player : getServer().getOnlinePlayers()) {
+                TerrainCustomizeManager.applyEffectToPlayer(player);
+                TerrainCustomizeManager.applyTimeToPlayer(player);
+            }
+        }
+    }.runTaskTimer(this, 20L, 180L);
+}
+```
+
+Runs every 180 ticks (9 seconds) to:
+- Apply environmental effects to players
+- Update player time based on territory
+
+## Permissions
+
+| Permission | Description |
+|-----------|-------------|
+| `dbcplugin.terrain.create` | Create territories |
+| `dbcplugin.terrain.delete` | Delete territories |
+| `dbcplugin.terrain.commit` | Generate territories |
+| `dbcplugin.terrain.price` | Set prices |
+| `dbcplugin.terrain.member` | Add members |
+| `dbcplugin.terrain.kick` | Remove members |
+| `dbcplugin.terrain.transfer` | Transfer ownership |
+| `dbcplugin.terrain.sell` | Sell territories |
+| `dbcplugin.terrain.info` | View territory info |
+| `dbcplugin.admin.manage` | Admin override for all actions |
+
+## Best Practices
+
+<Steps>
+  <Step title="Plan your layout">
+    Plan territory sizes and locations before committing to avoid overlap and conflicts.
+  </Step>
+  
+  <Step title="Set appropriate prices">
+    Balance territory prices with your economy. Larger territories should cost significantly more.
+  </Step>
+  
+  <Step title="Use member roles wisely">
+    Grant minimal permissions needed. Use `build` and `break` separately for better control.
+  </Step>
+  
+  <Step title="Monitor leases">
+    Check lease statuses regularly to manage grace periods and prevent unexpected evictions.
+  </Step>
+  
+  <Step title="Backup customizations">
+    Territory customizations are stored in the database. Regular backups prevent data loss.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="Territory not protecting">
+  - Verify territory is committed: `/terrain info <id>`
+  - Check origin location is set
+  - Ensure protection listeners are loaded
+  - Check for permission conflicts with other plugins
+</Accordion>
+
+<Accordion title="Environmental effects not applying">
+  - Verify TerrainCustomizeManager is initialized
+  - Check terrain effects task is running (should start on plugin enable)
+  - Ensure player is actually inside territory boundaries
+  - Check console for errors in effect application
+</Accordion>
+
+<Accordion title="Can't commit territory (collision error)">
+  - Territory overlaps with existing territory
+  - Check buffer distance between territories
+  - Use `/terrain list` to see all territories
+  - Adjust your position and try again
+</Accordion>
+
+<Accordion title="Lease assignment failing">
+  - Selection must be within parent territory
+  - Selection size must match lease chunk size
+  - Cannot overlap with other sub-territories
+  - Use `/lease cancel` to exit selection mode and retry
+</Accordion>
+
+<Accordion title="Time/weather not changing">
+  - Effects are per-player, not world-wide
+  - Player must be inside territory for time to apply
+  - Weather affects the whole world (use cautiously)
+  - Check if another plugin is overriding world settings
+</Accordion>

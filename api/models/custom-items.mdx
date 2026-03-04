@@ -1,0 +1,508 @@
+---
+title: CustomItem Model
+description: Data model for creating and managing custom items with stats, effects, and behaviors
+---
+
+The `CustomItem` class is the core model for the custom items system, allowing you to create items with custom attributes, stats, effects, durability, and scripted behaviors.
+
+## Package
+
+```java
+org.debentialc.customitems.tools.ci.CustomItem
+```
+
+## Overview
+
+CustomItem provides a builder-pattern API for creating items with:
+- Custom display names and lore
+- Stat bonuses and operations
+- Potion effects
+- Custom durability
+- Consumable properties
+- Command execution on use
+- TP (Training Points) values
+- Attack damage modifiers
+- NBT data
+
+## Fields
+
+<ResponseField name="count" type="int" default="1">
+  The stack size of the item
+</ResponseField>
+
+<ResponseField name="material" type="int" required>
+  The Minecraft material ID for the item
+</ResponseField>
+
+<ResponseField name="durabilityData" type="short" default="0">
+  The durability/data value for the item material
+</ResponseField>
+
+<ResponseField name="displayName" type="String">
+  The custom display name shown in the inventory
+</ResponseField>
+
+<ResponseField name="lore" type="List<String>">
+  The lore lines shown in the item tooltip
+</ResponseField>
+
+<ResponseField name="value" type="double">
+  A generic value associated with the item
+</ResponseField>
+
+<ResponseField name="operation" type="HashMap<String, String>">
+  Map of stat names to operation types (e.g., "ADD", "MULTIPLY")
+</ResponseField>
+
+<ResponseField name="valueByStat" type="HashMap<String, Double>">
+  Map of stat names to their bonus values
+</ResponseField>
+
+<ResponseField name="effects" type="HashMap<String, Double>">
+  Map of potion effect names to their amplifier values
+</ResponseField>
+
+<ResponseField name="id" type="String" required>
+  Unique identifier for the custom item
+</ResponseField>
+
+<ResponseField name="isActive" type="boolean" default="true">
+  Whether the item is currently active/enabled
+</ResponseField>
+
+<ResponseField name="maxDurability" type="int" default="-1">
+  Maximum durability for the item (-1 = no custom durability)
+</ResponseField>
+
+<ResponseField name="unbreakable" type="boolean" default="false">
+  Whether the item is unbreakable
+</ResponseField>
+
+<ResponseField name="consumable" type="boolean" default="false">
+  Whether the item is consumed when used
+</ResponseField>
+
+<ResponseField name="commands" type="List<String>">
+  List of commands to execute when the item is used
+</ResponseField>
+
+<ResponseField name="tpValue" type="int" default="0">
+  Amount of Training Points (TP) to give when used
+</ResponseField>
+
+<ResponseField name="tpConsumeStack" type="boolean" default="false">
+  Whether to consume the entire stack when giving TP
+</ResponseField>
+
+<ResponseField name="attackDamage" type="int" default="-1">
+  Custom attack damage value (-1 = default)
+</ResponseField>
+
+<ResponseField name="nbtData" type="String">
+  Raw NBT data for advanced item customization
+</ResponseField>
+
+## Constructors
+
+<ParamField path="CustomItem()" type="constructor">
+  Creates a new CustomItem with default values.
+</ParamField>
+
+## Builder Methods
+
+All setter methods return `this` to enable method chaining.
+
+### setMaterial()
+
+Sets the material type for the item.
+
+```java
+public CustomItem setMaterial(int material)
+public CustomItem setMaterial(int material, short data)
+```
+
+**Parameters:**
+- `material` (int): The Minecraft material ID
+- `data` (short): Optional durability/data value
+
+**Returns:** `CustomItem` - The current instance for chaining
+
+**Example:**
+```java
+CustomItem item = new CustomItem()
+    .setMaterial(276, (short) 0); // Diamond Sword
+```
+
+**Source:** `CustomItem.java:47`
+
+---
+
+### setDisplayName()
+
+Sets the display name of the item.
+
+```java
+public CustomItem setDisplayName(String displayName)
+```
+
+**Parameters:**
+- `displayName` (String): The display name (supports color codes)
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:58`
+
+---
+
+### setLore()
+
+Sets the lore (description lines) for the item.
+
+```java
+public CustomItem setLore(List<String> lore)
+```
+
+**Parameters:**
+- `lore` (List&lt;String&gt;): List of lore lines
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:63`
+
+---
+
+### setOperation()
+
+Sets the operation type for a stat modifier.
+
+```java
+public CustomItem setOperation(String operation, String stat)
+public CustomItem setOperation(HashMap<String, String> operations)
+```
+
+**Parameters:**
+- `operation` (String): Operation type (e.g., "ADD", "MULTIPLY")
+- `stat` (String): The stat name
+- `operations` (HashMap): Map of stats to operations
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:68`
+
+---
+
+### setBonusStat()
+
+Adds a bonus stat to the item.
+
+```java
+public CustomItem setBonusStat(String stat, double value)
+```
+
+**Parameters:**
+- `stat` (String): The stat name (e.g., "strength", "defense")
+- `value` (double): The bonus value
+
+**Returns:** `CustomItem`
+
+**Example:**
+```java
+item.setBonusStat("strength", 10.0)
+    .setBonusStat("defense", 5.0);
+```
+
+**Source:** `CustomItem.java:78`
+
+---
+
+### setValueByStat()
+
+Sets all stat bonuses at once.
+
+```java
+public CustomItem setValueByStat(HashMap<String, Double> valueByStat)
+```
+
+**Parameters:**
+- `valueByStat` (HashMap): Map of stat names to values
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:83`
+
+---
+
+### setId()
+
+Sets the unique identifier for the item.
+
+```java
+public CustomItem setId(String id)
+```
+
+**Parameters:**
+- `id` (String): Unique item identifier
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:88`
+
+---
+
+### setEffects()
+
+Sets potion effects that apply when the item is equipped or used.
+
+```java
+public CustomItem setEffects(HashMap<String, Double> effects)
+```
+
+**Parameters:**
+- `effects` (HashMap): Map of effect names to amplifier values
+
+**Returns:** `CustomItem`
+
+**Example:**
+```java
+HashMap<String, Double> effects = new HashMap<>();
+effects.put("SPEED", 1.0);
+effects.put("REGENERATION", 0.0);
+item.setEffects(effects);
+```
+
+**Source:** `CustomItem.java:93`
+
+---
+
+### setMaxDurability()
+
+Sets a custom maximum durability for the item.
+
+```java
+public CustomItem setMaxDurability(int maxDurability)
+```
+
+**Parameters:**
+- `maxDurability` (int): Maximum durability (-1 for default)
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:98`
+
+---
+
+### setUnbreakable()
+
+Sets whether the item is unbreakable.
+
+```java
+public CustomItem setUnbreakable(boolean unbreakable)
+```
+
+**Parameters:**
+- `unbreakable` (boolean): Whether the item should be unbreakable
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:103`
+
+---
+
+### setConsumable()
+
+Sets whether the item is consumed when used.
+
+```java
+public CustomItem setConsumable(boolean consumable)
+```
+
+**Parameters:**
+- `consumable` (boolean): Whether the item should be consumed
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:108`
+
+---
+
+### setCommands()
+
+Sets commands to execute when the item is used.
+
+```java
+public CustomItem setCommands(List<String> commands)
+```
+
+**Parameters:**
+- `commands` (List&lt;String&gt;): List of commands (supports placeholders: `@dp` for user, `@p` for target)
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:113`
+
+---
+
+### setTpValue()
+
+Sets the amount of Training Points to give when used.
+
+```java
+public CustomItem setTpValue(int tpValue)
+```
+
+**Parameters:**
+- `tpValue` (int): Amount of TP to give
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:118`
+
+---
+
+### setTpConsumeStack()
+
+Sets whether to consume the entire stack when giving TP.
+
+```java
+public CustomItem setTpConsumeStack(boolean tpConsumeStack)
+```
+
+**Parameters:**
+- `tpConsumeStack` (boolean): Whether to consume entire stack
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:123`
+
+---
+
+### setAttackDamage()
+
+Sets a custom attack damage value.
+
+```java
+public CustomItem setAttackDamage(int attackDamage)
+```
+
+**Parameters:**
+- `attackDamage` (int): Custom attack damage (-1 for default)
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:128`
+
+---
+
+### setNbtData()
+
+Sets raw NBT data for advanced customization.
+
+```java
+public CustomItem setNbtData(String nbtData)
+```
+
+**Parameters:**
+- `nbtData` (String): Raw NBT data string
+
+**Returns:** `CustomItem`
+
+**Source:** `CustomItem.java:133`
+
+---
+
+## Usage Examples
+
+### Creating a Basic Custom Item
+
+```java
+import org.debentialc.customitems.tools.ci.CustomItem;
+import java.util.Arrays;
+
+CustomItem sword = new CustomItem()
+    .setId("legendary_sword")
+    .setMaterial(276) // Diamond Sword
+    .setDisplayName("§6§lLegendary Blade")
+    .setLore(Arrays.asList(
+        "§7A powerful weapon forged",
+        "§7in the fires of Mount Doom",
+        "",
+        "§c+15 Strength",
+        "§9+10 Critical Damage"
+    ));
+```
+
+### Adding Stats and Effects
+
+```java
+CustomItem armor = new CustomItem()
+    .setId("guardian_chestplate")
+    .setMaterial(311) // Diamond Chestplate
+    .setDisplayName("§b§lGuardian's Protection")
+    .setBonusStat("defense", 20.0)
+    .setBonusStat("health", 15.0)
+    .setMaxDurability(1000)
+    .setUnbreakable(false);
+
+// Add regeneration effect
+HashMap<String, Double> effects = new HashMap<>();
+effects.put("REGENERATION", 0.0);
+effects.put("RESISTANCE", 0.0);
+armor.setEffects(effects);
+```
+
+### Creating a Consumable Item
+
+```java
+import java.util.Arrays;
+
+CustomItem potion = new CustomItem()
+    .setId("healing_elixir")
+    .setMaterial(373) // Potion
+    .setDisplayName("§d§lHealing Elixir")
+    .setConsumable(true)
+    .setCommands(Arrays.asList(
+        "effect @dp 10 10 5", // Regeneration
+        "effect @dp 11 2 5"   // Resistance
+    ));
+```
+
+### Creating a TP Reward Item
+
+```java
+CustomItem tpScroll = new CustomItem()
+    .setId("tp_scroll")
+    .setMaterial(339) // Paper
+    .setDisplayName("§e§lTraining Scroll")
+    .setLore(Arrays.asList(
+        "§7Use to gain 1000 TP",
+        "§7Consumes the entire stack"
+    ))
+    .setTpValue(1000)
+    .setTpConsumeStack(true)
+    .setConsumable(true);
+```
+
+### Creating an Item with Multiple Stats
+
+```java
+HashMap<String, Double> stats = new HashMap<>();
+stats.put("strength", 25.0);
+stats.put("defense", 15.0);
+stats.put("speed", 10.0);
+stats.put("criticalDamage", 30.0);
+
+HashMap<String, String> operations = new HashMap<>();
+operations.put("strength", "ADD");
+operations.put("defense", "ADD");
+operations.put("speed", "MULTIPLY");
+operations.put("criticalDamage", "ADD");
+
+CustomItem epicSword = new CustomItem()
+    .setId("epic_blade")
+    .setMaterial(276)
+    .setDisplayName("§5§lEpic Blade of Legends")
+    .setValueByStat(stats)
+    .setOperation(operations)
+    .setAttackDamage(15)
+    .setMaxDurability(2000);
+```

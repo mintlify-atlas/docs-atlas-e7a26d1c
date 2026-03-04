@@ -1,97 +1,260 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: Debentialc Documentation
+description: A comprehensive Minecraft server plugin for boosters, custom items, raids, and territory management
+mode: custom
 ---
 
-## Setting up
+<div className="relative overflow-hidden bg-gradient-to-br from-[#0f1117] via-[#1a1d27] to-[#0f1117] dark:bg-gradient-to-br dark:from-[#0f1117] dark:via-[#1a1d27] dark:to-[#0f1117] py-20">
+  <div className="max-w-7xl mx-auto px-6 lg:px-8">
+    <div className="lg:grid lg:grid-cols-12 lg:gap-8 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-100 dark:text-gray-100">
+          Welcome to Debentialc
+        </h1>
+        <p className="mt-6 text-lg sm:text-xl text-gray-400 dark:text-gray-400 max-w-2xl">
+          A powerful Minecraft Bukkit/Spigot plugin that brings advanced gameplay features to your server. Manage XP boosters, create custom items with unique stats, configure dynamic raids, and control territory claims with ease.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-4">
+          <a
+            href="/quickstart"
+            className="inline-flex items-center px-6 py-3 rounded-lg bg-[#2ECC40] text-white font-semibold hover:bg-[#25a533] transition-colors"
+          >
+            Get Started
+          </a>
+          <a
+            href="/introduction"
+            className="inline-flex items-center px-6 py-3 rounded-lg border border-white/30 bg-white/10 text-white font-semibold hover:bg-white/20 hover:border-white/50 transition-colors"
+          >
+            View Documentation
+          </a>
+        </div>
+      </div>
+      <div className="hidden lg:block lg:col-span-5 mt-12 lg:mt-0">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-[#2ECC40]/20 to-[#7FDBFF]/20 blur-3xl"></div>
+          <div className="relative bg-[#1a1d27] dark:bg-[#1a1d27] border border-[#27272a] dark:border-[#27272a] rounded-2xl p-6">
+            <div className="text-sm font-mono text-gray-300 dark:text-gray-300">
+              <div className="text-[#7FDBFF]">$ /booster activate 2.5</div>
+              <div className="mt-2 text-gray-400 dark:text-gray-400">
+                ✓ Global booster activated: 2.5x for 2 hours
+              </div>
+              <div className="mt-4 text-[#7FDBFF]">$ /customitem create legendary_sword</div>
+              <div className="mt-2 text-gray-400 dark:text-gray-400">
+                ✓ Custom item created successfully
+              </div>
+              <div className="mt-4 text-[#7FDBFF]">$ /raid create boss_raid</div>
+              <div className="mt-2 text-gray-400 dark:text-gray-400">
+                ✓ Raid configuration started
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Quick Start
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Get Debentialc up and running on your Minecraft server in minutes
+  </p>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+  <Steps>
+    <Step title="Download and Install">
+      Download the latest Debentialc JAR file and place it in your server's `plugins` folder. Make sure you're running Bukkit or Spigot 1.8 or higher.
 
-## Make it yours
+      ```bash
+      # Place the plugin JAR in your plugins folder
+      cp Debentialc-1.1.0.jar /path/to/server/plugins/
+      ```
+    </Step>
 
-Design a docs site that looks great and empowers your users.
+    <Step title="Install Dependencies">
+      Debentialc requires several optional plugins for full functionality:
+      
+      - **PlaceholderAPI** - For placeholder support in messages and scoreboards
+      - **Vault** - For economy integration with territory claims
+      - **CustomNPCs** - For the raid system to work with NPCs
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
+      ```bash
+      # Download and install dependencies in your plugins folder
+      # These are optional but recommended for full features
+      ```
+
+      <Note>
+        The plugin will work without these dependencies, but some features may be disabled. Check the console on startup for dependency status.
+      </Note>
+    </Step>
+
+    <Step title="Start Your Server">
+      Start or restart your Minecraft server. Debentialc will automatically initialize all systems and create default configuration files.
+
+      ```bash
+      # Check the console for successful initialization
+      [Debentialc] Plugin successfully enabled
+      [Debentialc] Version: 1.1.5
+      [Boosters] Sistema de Boosters inicializado correctamente
+      [Raids] Sistema de raids inicializado
+      [Claims] Sistema de terrenos inicializado
+      ```
+    </Step>
+
+    <Step title="Configure and Test">
+      Use the in-game commands to start using Debentialc features. Try activating your first booster or creating a custom item:
+
+      ```bash
+      # In-game commands to test
+      /booster help
+      /customitem help
+      /raid help
+      /terrain help
+      ```
+
+      <Accordion title="Example: Activate a Global Booster">
+        ```bash
+        /booster activate 2.0
+        ```
+        This activates a 2.0x multiplier for all players on the server for the configured duration.
+      </Accordion>
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Core Features
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Explore the powerful systems that make Debentialc essential for your server
+  </p>
+
+  <CardGroup cols={2}>
     <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+      title="Booster System"
+      icon="rocket"
+      href="/systems/boosters"
+    >
+      Global and personal XP/multiplier boosters with configurable durations, ranks, and PlaceholderAPI integration.
+    </Card>
+    <Card
+      title="Custom Items"
+      icon="wand-magic-sparkles"
+      href="/systems/custom-items"
+    >
+      Create custom items with stat bonuses (STR, CON, DEX, WILL, MND) and special regeneration effects.
+    </Card>
+    <Card
+      title="Raid System"
+      icon="skull"
+      href="/systems/raids"
+    >
+      Configure dynamic raids with CustomNPC integration, party support, wave mechanics, and cooldown management.
+    </Card>
+    <Card
+      title="Territory Claims"
+      icon="map-location-dot"
+      href="/systems/claims"
+    >
+      Advanced claiming and leasing system with environmental customization, protection, and Vault economy integration.
+    </Card>
+  </CardGroup>
+</div>
 
-## Create beautiful pages
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Browse Documentation
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Find detailed guides and API references for every feature
+  </p>
 
-Everything you need to create world-class documentation.
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <a
+      href="/installation"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#2ECC40] dark:hover:border-[#2ECC40] overflow-hidden no-underline transition-colors"
+    >
+      <div className="p-6 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
+          Installation Guide
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Step-by-step instructions for installing and configuring Debentialc on your server.
+        </p>
+        <div className="flex items-center text-sm font-medium text-gray-600 dark:text-gray-400 group-hover:text-[#2ECC40] dark:group-hover:text-[#2ECC40]">
+          Read guide
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+    <a
+      href="/api/commands/booster"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#2ECC40] dark:hover:border-[#2ECC40] overflow-hidden no-underline transition-colors"
+    >
+      <div className="p-6 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
+          Command Reference
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Complete documentation of all in-game commands with usage examples and permissions.
+        </p>
+        <div className="flex items-center text-sm font-medium text-gray-600 dark:text-gray-400 group-hover:text-[#2ECC40] dark:group-hover:text-[#2ECC40]">
+          View commands
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
 
-## Need inspiration?
+    <a
+      href="/api/managers/booster-manager"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#2ECC40] dark:hover:border-[#2ECC40] overflow-hidden no-underline transition-colors"
+    >
+      <div className="p-6 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
+          Developer API
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Integrate Debentialc into your own plugins with our comprehensive Java API.
+        </p>
+        <div className="flex items-center text-sm font-medium text-gray-600 dark:text-gray-400 group-hover:text-[#2ECC40] dark:group-hover:text-[#2ECC40]">
+          Explore API
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl border border-gray-200 dark:border-[#27272a] bg-gradient-to-r from-[#2ECC40]/10 to-[#7FDBFF]/10 dark:from-[#2ECC40]/10 dark:to-[#7FDBFF]/10 p-8 sm:p-12">
+    <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+      Ready to enhance your server?
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 mb-6 max-w-2xl">
+      Start using Debentialc today and bring powerful gameplay features to your Minecraft community.
+    </p>
+    <div className="flex flex-wrap gap-4">
+      <a
+        href="/quickstart"
+        className="inline-flex items-center px-6 py-3 rounded-lg bg-[#2ECC40] text-white font-semibold hover:bg-[#25a533] transition-colors"
+      >
+        Get Started Now
+      </a>
+      <a
+        href="https://github.com/TheFive40/Debentialc"
+        className="inline-flex items-center px-6 py-3 rounded-lg border border-gray-300 dark:border-[#27272a] bg-white dark:bg-[#1a1d27] text-gray-900 dark:text-white font-semibold hover:bg-gray-50 dark:hover:bg-[#242838] transition-colors"
+      >
+        View on GitHub
+      </a>
+    </div>
+  </div>
+</div>

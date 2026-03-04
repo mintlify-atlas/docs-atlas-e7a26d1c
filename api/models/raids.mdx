@@ -1,0 +1,768 @@
+---
+title: Raid Models
+description: Data models for the raid system including raids, sessions, waves, and parties
+---
+
+The raid system provides cooperative PvE challenges where groups of players fight through waves of enemies. The system includes multiple interconnected models that manage raid configurations, active sessions, player parties, and wave progression.
+
+## Raid
+
+The main configuration model for a raid instance.
+
+### Package
+
+```java
+org.debentialc.raids.models.Raid
+```
+
+### Fields
+
+<ResponseField name="raidId" type="String" required>
+  Unique identifier for the raid
+</ResponseField>
+
+<ResponseField name="raidName" type="String" required>
+  Display name of the raid
+</ResponseField>
+
+<ResponseField name="description" type="String">
+  Description of the raid's theme or objectives
+</ResponseField>
+
+<ResponseField name="arenaSpawnPoint" type="Location">
+  Where enemies spawn during the raid
+</ResponseField>
+
+<ResponseField name="playerSpawnPoint" type="Location" required>
+  Where players spawn when entering the raid
+</ResponseField>
+
+<ResponseField name="waves" type="List<Wave>" required>
+  List of waves that make up the raid
+</ResponseField>
+
+<ResponseField name="status" type="RaidStatus">
+  Current status of the raid (IDLE, IN_PROGRESS, COMPLETED, etc.)
+</ResponseField>
+
+<ResponseField name="cooldownSeconds" type="long" default="3600">
+  Cooldown time in seconds between raid attempts
+</ResponseField>
+
+<ResponseField name="minPlayers" type="int" default="1">
+  Minimum number of players required to start
+</ResponseField>
+
+<ResponseField name="maxPlayers" type="int" default="5">
+  Maximum number of players allowed
+</ResponseField>
+
+<ResponseField name="enabled" type="boolean" default="true">
+  Whether the raid is currently enabled
+</ResponseField>
+
+<ResponseField name="createdAt" type="long">
+  Timestamp when the raid was created
+</ResponseField>
+
+<ResponseField name="createdBy" type="String">
+  Who created the raid configuration
+</ResponseField>
+
+### Constructor
+
+<ParamField path="Raid(raidId, raidName)" type="constructor">
+  Creates a new raid with default settings.
+  
+  **Parameters:**
+  - `raidId` (String): Unique identifier
+  - `raidName` (String): Display name
+</ParamField>
+
+### Methods
+
+#### getWaveByIndex()
+
+Retrieves a specific wave by its index.
+
+```java
+public Wave getWaveByIndex(int index)
+```
+
+**Parameters:**
+- `index` (int): Zero-based wave index
+
+**Returns:** `Wave` - The wave at the specified index, or `null` if invalid
+
+**Source:** `Raid.java:68`
+
+---
+
+#### addWave()
+
+Adds a new wave to the raid.
+
+```java
+public void addWave(Wave wave)
+```
+
+**Parameters:**
+- `wave` (Wave): The wave to add
+
+**Source:** `Raid.java:75`
+
+---
+
+#### getTotalWaves()
+
+Returns the total number of waves in the raid.
+
+```java
+public int getTotalWaves()
+```
+
+**Returns:** `int` - Total wave count
+
+**Source:** `Raid.java:79`
+
+---
+
+#### isConfigured()
+
+Checks if the raid is properly configured and ready to start.
+
+```java
+public boolean isConfigured()
+```
+
+**Returns:** `boolean` - `true` if player spawn point is set and there are waves
+
+**Source:** `Raid.java:83`
+
+---
+
+## RaidSession
+
+Represents an active raid instance in progress.
+
+### Package
+
+```java
+org.debentialc.raids.models.RaidSession
+```
+
+### Fields
+
+<ResponseField name="sessionId" type="String" required>
+  Unique identifier for this session
+</ResponseField>
+
+<ResponseField name="raid" type="Raid" required>
+  Reference to the raid configuration
+</ResponseField>
+
+<ResponseField name="party" type="Party" required>
+  The party participating in this session
+</ResponseField>
+
+<ResponseField name="currentWaveIndex" type="int">
+  Index of the current active wave (zero-based)
+</ResponseField>
+
+<ResponseField name="status" type="RaidStatus">
+  Current status of the session
+</ResponseField>
+
+<ResponseField name="startTime" type="long">
+  Timestamp when the session started
+</ResponseField>
+
+<ResponseField name="endTime" type="long">
+  Timestamp when the session ended
+</ResponseField>
+
+<ResponseField name="activePlayers" type="Set<UUID>">
+  UUIDs of players currently alive and participating
+</ResponseField>
+
+<ResponseField name="deadPlayers" type="Set<UUID>">
+  UUIDs of players who died during the raid
+</ResponseField>
+
+<ResponseField name="leftPlayers" type="Set<UUID>">
+  UUIDs of players who left the raid
+</ResponseField>
+
+<ResponseField name="winner" type="String">
+  Name of the winning player or party
+</ResponseField>
+
+### Constructor
+
+<ParamField path="RaidSession(sessionId, raid, party)" type="constructor">
+  Creates a new raid session.
+  
+  **Parameters:**
+  - `sessionId` (String): Unique session identifier
+  - `raid` (Raid): The raid configuration
+  - `party` (Party): The participating party
+</ParamField>
+
+### Methods
+
+#### getCurrentWave()
+
+Gets the current active wave.
+
+```java
+public Wave getCurrentWave()
+```
+
+**Returns:** `Wave` - The current wave, or `null` if none
+
+**Source:** `RaidSession.java:42`
+
+---
+
+#### hasNextWave()
+
+Checks if there are more waves after the current one.
+
+```java
+public boolean hasNextWave()
+```
+
+**Returns:** `boolean` - `true` if more waves exist
+
+**Source:** `RaidSession.java:46`
+
+---
+
+#### moveToNextWave()
+
+Advances to the next wave.
+
+```java
+public void moveToNextWave()
+```
+
+**Source:** `RaidSession.java:50`
+
+---
+
+#### playerDied()
+
+Marks a player as dead in the raid.
+
+```java
+public void playerDied(UUID playerId)
+```
+
+**Parameters:**
+- `playerId` (UUID): The player's UUID
+
+**Source:** `RaidSession.java:54`
+
+---
+
+#### playerLeft()
+
+Marks a player as having left the raid.
+
+```java
+public void playerLeft(UUID playerId)
+```
+
+**Parameters:**
+- `playerId` (UUID): The player's UUID
+
+**Source:** `RaidSession.java:59`
+
+---
+
+#### playerReturned()
+
+Marks a player as having returned to the raid.
+
+```java
+public void playerReturned(UUID playerId)
+```
+
+**Parameters:**
+- `playerId` (UUID): The player's UUID
+
+**Source:** `RaidSession.java:64`
+
+---
+
+#### canPlayerRejoin()
+
+Checks if a player is allowed to rejoin the raid.
+
+```java
+public boolean canPlayerRejoin(UUID playerId)
+```
+
+**Parameters:**
+- `playerId` (UUID): The player's UUID
+
+**Returns:** `boolean` - `true` if the player can rejoin (not dead and raid is in progress)
+
+**Source:** `RaidSession.java:71`
+
+---
+
+#### isRaidFailed()
+
+Checks if the raid has failed (no active players).
+
+```java
+public boolean isRaidFailed()
+```
+
+**Returns:** `boolean` - `true` if all players are dead or left
+
+**Source:** `RaidSession.java:75`
+
+---
+
+#### getProgress()
+
+Calculates the raid completion percentage.
+
+```java
+public int getProgress()
+```
+
+**Returns:** `int` - Progress percentage (0-100)
+
+**Source:** `RaidSession.java:79`
+
+---
+
+#### getDurationSeconds()
+
+Returns how long the raid has been running.
+
+```java
+public long getDurationSeconds()
+```
+
+**Returns:** `long` - Duration in seconds
+
+**Source:** `RaidSession.java:83`
+
+---
+
+#### isWaveActive()
+
+Checks if there is currently an active wave.
+
+```java
+public boolean isWaveActive()
+```
+
+**Returns:** `boolean` - `true` if raid is in progress and has an active wave
+
+**Source:** `RaidSession.java:88`
+
+---
+
+## Wave
+
+Represents a single wave of enemies in a raid.
+
+### Package
+
+```java
+org.debentialc.raids.models.Wave
+```
+
+### Fields
+
+<ResponseField name="waveNumber" type="int" required>
+  The wave number (1-based for display)
+</ResponseField>
+
+<ResponseField name="spawnPoints" type="List<SpawnPoint>">
+  List of spawn points with enemy configurations
+</ResponseField>
+
+<ResponseField name="rewards" type="List<WaveReward>">
+  Rewards given upon completing this wave
+</ResponseField>
+
+<ResponseField name="status" type="WaveStatus">
+  Current status (PENDING, ACTIVE, COMPLETED)
+</ResponseField>
+
+<ResponseField name="description" type="String">
+  Description of the wave
+</ResponseField>
+
+### Constructor
+
+<ParamField path="Wave(waveNumber)" type="constructor">
+  Creates a new wave.
+  
+  **Parameters:**
+  - `waveNumber` (int): The wave number
+</ParamField>
+
+### Methods
+
+#### addSpawnPoint()
+
+```java
+public void addSpawnPoint(SpawnPoint spawnPoint)
+```
+
+**Source:** `Wave.java:37`
+
+---
+
+#### addReward()
+
+```java
+public void addReward(WaveReward reward)
+```
+
+**Source:** `Wave.java:41`
+
+---
+
+#### getTotalEnemies()
+
+Returns the total number of enemies in this wave.
+
+```java
+public int getTotalEnemies()
+```
+
+**Returns:** `int` - Sum of all enemy quantities from spawn points
+
+**Source:** `Wave.java:45`
+
+---
+
+#### hasRewards()
+
+```java
+public boolean hasRewards()
+```
+
+**Returns:** `boolean` - `true` if the wave has rewards
+
+**Source:** `Wave.java:53`
+
+---
+
+## Party
+
+Represents a group of players participating in a raid together.
+
+### Package
+
+```java
+org.debentialc.raids.models.Party
+```
+
+### Fields
+
+<ResponseField name="partyId" type="String" required>
+  Unique party identifier
+</ResponseField>
+
+<ResponseField name="leaderUuid" type="UUID" required>
+  UUID of the party leader
+</ResponseField>
+
+<ResponseField name="members" type="Map<UUID, PartyMember>">
+  Map of member UUIDs to PartyMember objects
+</ResponseField>
+
+<ResponseField name="maxSize" type="int">
+  Maximum number of members allowed
+</ResponseField>
+
+<ResponseField name="createdAt" type="long">
+  Timestamp when the party was created
+</ResponseField>
+
+<ResponseField name="status" type="PartyStatus">
+  Current party status (WAITING, IN_RAID, etc.)
+</ResponseField>
+
+### Constructor
+
+<ParamField path="Party(partyId, leaderUuid, maxSize)" type="constructor">
+  Creates a new party with the leader as the first member.
+  
+  **Parameters:**
+  - `partyId` (String): Unique identifier
+  - `leaderUuid` (UUID): The party leader's UUID
+  - `maxSize` (int): Maximum party size
+</ParamField>
+
+### Methods
+
+#### addMember()
+
+```java
+public void addMember(UUID playerUuid, boolean isLeader)
+```
+
+**Parameters:**
+- `playerUuid` (UUID): Player to add
+- `isLeader` (boolean): Whether they are the leader
+
+**Source:** `Party.java:35`
+
+---
+
+#### removeMember()
+
+```java
+public void removeMember(UUID playerUuid)
+```
+
+**Source:** `Party.java:43`
+
+---
+
+#### hasMember()
+
+```java
+public boolean hasMember(UUID playerUuid)
+```
+
+**Returns:** `boolean` - `true` if the player is in the party
+
+**Source:** `Party.java:47`
+
+---
+
+#### isFull()
+
+```java
+public boolean isFull()
+```
+
+**Returns:** `boolean` - `true` if the party is at max capacity
+
+**Source:** `Party.java:51`
+
+---
+
+#### canStartRaid()
+
+```java
+public boolean canStartRaid()
+```
+
+**Returns:** `boolean` - `true` if there is at least one member
+
+**Source:** `Party.java:55`
+
+---
+
+#### isLeader()
+
+```java
+public boolean isLeader(UUID playerUuid)
+```
+
+**Returns:** `boolean` - `true` if the player is the party leader
+
+**Source:** `Party.java:66`
+
+---
+
+#### getActivePlayers()
+
+```java
+public List<UUID> getActivePlayers()
+```
+
+**Returns:** `List<UUID>` - List of all member UUIDs
+
+**Source:** `Party.java:70`
+
+---
+
+#### getAgeSeconds()
+
+```java
+public long getAgeSeconds()
+```
+
+**Returns:** `long` - How long the party has existed in seconds
+
+**Source:** `Party.java:74`
+
+---
+
+## RaidStatus
+
+Enum representing the state of a raid.
+
+### Package
+
+```java
+org.debentialc.raids.models.RaidStatus
+```
+
+### Values
+
+<ResponseField name="IDLE" type="enum">
+  Raid is inactive (Spanish: "Inactivo")
+</ResponseField>
+
+<ResponseField name="IN_PROGRESS" type="enum">
+  Raid is currently running (Spanish: "En Progreso")
+</ResponseField>
+
+<ResponseField name="WAVE_ACTIVE" type="enum">
+  A wave is currently active (Spanish: "Oleada Activa")
+</ResponseField>
+
+<ResponseField name="WAVE_COOLDOWN" type="enum">
+  Waiting between waves (Spanish: "Esperando Siguiente")
+</ResponseField>
+
+<ResponseField name="COMPLETED" type="enum">
+  Raid completed successfully (Spanish: "Completada")
+</ResponseField>
+
+<ResponseField name="FAILED" type="enum">
+  Raid failed (Spanish: "Fallida")
+</ResponseField>
+
+<ResponseField name="PAUSED" type="enum">
+  Raid is paused (Spanish: "Pausada")
+</ResponseField>
+
+### Methods
+
+#### getDisplayName()
+
+```java
+public String getDisplayName()
+```
+
+**Returns:** `String` - Localized display name (Spanish)
+
+**Source:** `RaidStatus.java:21`
+
+---
+
+## Usage Examples
+
+### Creating and Configuring a Raid
+
+```java
+import org.debentialc.raids.models.*;
+import org.bukkit.Location;
+
+// Create a new raid
+Raid raid = new Raid("dragon_lair", "Dragon's Lair");
+raid.setDescription("Face the ancient dragon and its minions");
+raid.setPlayerSpawnPoint(playerSpawn);
+raid.setMinPlayers(2);
+raid.setMaxPlayers(4);
+raid.setCooldownSeconds(7200); // 2 hours
+
+// Add waves
+for (int i = 1; i <= 5; i++) {
+    Wave wave = new Wave(i);
+    wave.setDescription("Wave " + i + " - Increasing difficulty");
+    raid.addWave(wave);
+}
+
+if (raid.isConfigured()) {
+    System.out.println("Raid is ready with " + raid.getTotalWaves() + " waves");
+}
+```
+
+### Managing a Raid Session
+
+```java
+import java.util.UUID;
+
+// Create a party
+UUID leaderUuid = player.getUniqueId();
+Party party = new Party("party_123", leaderUuid, 4);
+
+// Start a raid session
+RaidSession session = new RaidSession("session_456", raid, party);
+
+System.out.println("Starting raid: " + session.getRaid().getRaidName());
+System.out.println("Wave 1 of " + session.getRaid().getTotalWaves());
+
+// Track progress
+while (session.isWaveActive() && !session.isRaidFailed()) {
+    int progress = session.getProgress();
+    Wave currentWave = session.getCurrentWave();
+    
+    System.out.println("Progress: " + progress + "% - Wave " + 
+                       (session.getCurrentWaveIndex() + 1));
+    
+    // ... wave completion logic ...
+    
+    if (session.hasNextWave()) {
+        session.moveToNextWave();
+    } else {
+        break;
+    }
+}
+
+long duration = session.getDurationSeconds();
+System.out.println("Raid completed in " + duration + " seconds");
+```
+
+### Handling Player Events
+
+```java
+// Player dies
+UUID playerId = player.getUniqueId();
+session.playerDied(playerId);
+
+if (session.isRaidFailed()) {
+    System.out.println("All players defeated! Raid failed.");
+}
+
+// Player leaves
+session.playerLeft(playerId);
+
+// Check if player can return
+if (session.canPlayerRejoin(playerId)) {
+    session.playerReturned(playerId);
+    System.out.println("Player rejoined the raid!");
+}
+```
+
+### Working with Parties
+
+```java
+Party party = new Party("party_789", leaderUuid, 5);
+
+// Add members
+for (Player member : partyMembers) {
+    if (!party.isFull()) {
+        party.addMember(member.getUniqueId(), false);
+    }
+}
+
+System.out.println("Party size: " + party.getMemberCount() + "/" + party.getMaxSize());
+
+if (party.canStartRaid()) {
+    if (party.isLeader(player.getUniqueId())) {
+        // Start raid
+        System.out.println("Leader starting raid...");
+    }
+}
+
+// Get party age
+long age = party.getAgeSeconds();
+System.out.println("Party has existed for " + age + " seconds");
+```

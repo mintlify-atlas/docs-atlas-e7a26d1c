@@ -1,0 +1,517 @@
+---
+title: 'Creating Custom Items'
+description: 'Complete guide to creating custom items and armor with stats, effects, and special abilities'
+---
+
+Debentialc provides a powerful custom item system that allows you to create weapons, tools, and armor with custom stats, potion effects, and Dragon Block C integration.
+
+## Overview
+
+Custom items can have:
+- **Custom Stats**: Modify DBC attributes (STR, DEX, CON, WIL, MND)
+- **Potion Effects**: Apply regeneration effects (Health, Ki, Stamina)
+- **Operations**: Additive (+), subtractive (-), or multiplicative (*) stat modifications
+- **Visual Customization**: Custom names and lore
+
+## Creating Your First Custom Item
+
+<Steps>
+  <Step title="Prepare the base item">
+    Hold the item you want to make custom in your hand. This can be any Minecraft item - sword, pickaxe, food, etc.
+    
+    Set the display name and lore using an anvil or:
+    ```bash
+    /ci rename §6§lLegendary Sword
+    /ci addline §7A powerful blade forged in dragon fire
+    /ci addline §e+50 Strength | +20 Dexterity
+    ```
+  </Step>
+  
+  <Step title="Register the item">
+    Create a custom item with a unique ID:
+    ```bash
+    /ci create legendary_sword
+    ```
+    
+    This registers the item you're holding with the ID `legendary_sword`.
+  </Step>
+  
+  <Step title="Add stats and effects">
+    Add bonus attributes to your item:
+    ```bash
+    # Additive bonuses (+)
+    /ci plus legendary_sword 50 str
+    /ci plus legendary_sword 20 dex
+    
+    # Multiplicative bonuses (*)
+    /ci percentage legendary_sword 0.15 str
+    
+    # Special effects
+    /ci effect HEALTHREGEN 0.02
+    ```
+  </Step>
+  
+  <Step title="Give to players">
+    Distribute your custom item:
+    ```bash
+    /ci give legendary_sword PlayerName 1
+    ```
+  </Step>
+</Steps>
+
+## Stat Operations
+
+### Understanding Operation Types
+
+Custom items support three operation types:
+
+<CodeGroup>
+```bash Additive (+)
+# Adds a flat amount to the stat
+/ci plus <item_id> <value> <stat>
+
+# Example: Add 50 strength
+/ci plus legendary_sword 50 str
+```
+
+```bash Subtractive (-)
+# Reduces the stat by a flat amount
+/ci less <item_id> <value> <stat>
+
+# Example: Reduce 10 constitution (cursed item)
+/ci less cursed_amulet 10 con
+```
+
+```bash Multiplicative (*)
+# Multiplies the stat by a percentage
+/ci percentage <item_id> <value> <stat>
+
+# Example: Multiply strength by 15% (0.15)
+/ci percentage berserker_ring 0.15 str
+```
+</CodeGroup>
+
+### Available Stats
+
+The following DBC stats can be modified:
+
+| Stat Code | Full Name | Effect |
+|-----------|-----------|--------|
+| `str` | Strength | Increases melee damage |
+| `dex` | Dexterity | Improves accuracy and speed |
+| `con` | Constitution | Increases max health |
+| `wil` | Willpower | Affects Ki regeneration |
+| `mnd` | Mind | Increases max Ki |
+
+## Adding Effects
+
+### Regeneration Effects
+
+Custom items can apply passive regeneration effects when worn or held:
+
+```bash
+/ci effect <type> <percentage>
+```
+
+Available effects:
+- `HEALTHREGEN` - Regenerates health over time
+- `KIREGEN` - Regenerates Ki over time  
+- `STAMINAREGEN` - Regenerates stamina over time
+
+<Tip>
+  Effect values are percentages. For example, `0.02` means 2% of max stat regenerated per tick.
+</Tip>
+
+### Effect Example
+
+```bash
+# Create a healing amulet
+/ci create healing_amulet
+/ci effect HEALTHREGEN 0.02  # 2% health regen
+/ci effect KIREGEN 0.01      # 1% Ki regen
+```
+
+### How Effects Work
+
+From the source code, effects are applied periodically:
+
+```java CustomManager.java:189-222
+private static void applyEffects(Player player, HashMap<String, Double> effects) {
+    try {
+        IDBCPlayer idbcPlayer = General.getDBCPlayer(player.getName());
+
+        effects.forEach((k, v) -> {
+            if (counter.incrementAndGet() % 5 != 0) return;
+
+            try {
+                if (k.equalsIgnoreCase("HEALTHREGEN")) {
+                    int max = StatsCalculator.getMaxHealth(idbcPlayer);
+                    int bonus = (int) (v * max);
+                    idbcPlayer.setHP(idbcPlayer.getHP() + bonus);
+                }
+                if (k.equalsIgnoreCase("KIREGEN")) {
+                    int max = StatsCalculator.getKiMax(idbcPlayer);
+                    int bonus = (int) (v * max);
+                    idbcPlayer.setKi(idbcPlayer.getKi() + bonus);
+                }
+                if (k.equalsIgnoreCase("STAMINAREGEN")) {
+                    int bonus = (int) (v * idbcPlayer.getStamina());
+                    idbcPlayer.setStamina(idbcPlayer.getStamina() + bonus);
+                }
+                // Visual feedback holograms
+                if (k.equalsIgnoreCase("KIREGEN"))
+                    EffectsManager.spawnHologram(player, CC.translate("&9⚡"), 1.5, -1.0);
+                else if (k.equalsIgnoreCase("STAMINAREGEN"))
+                    EffectsManager.spawnHologram(player, CC.translate("&e❃"), 0.4, 1.5);
+                else if (k.equalsIgnoreCase("HEALTHREGEN"))
+                    EffectsManager.spawnHologram(player, CC.translate("&c❤"), 1.0, 1.0);
+            } catch (Exception ignored) {}
+        });
+
+    } catch (Exception e) {
+    }
+}
+```
+
+## Custom Armor
+
+Armor pieces work similarly to items but use a different command set:
+
+### Creating Custom Armor
+
+```bash
+# Register armor piece
+/customarmor create <armor_id>
+
+# Add stats to armor
+/customarmor plus <armor_id> <value> <stat>
+/customarmor percentage <armor_id> <value> <stat>
+
+# Add effects
+/customarmor effect <armor_id> <type> <value>
+```
+
+### Armor Set Example
+
+Create a complete armor set with set bonuses:
+
+<CodeGroup>
+```bash Helmet
+/customarmor create dragon_helmet
+/customarmor plus dragon_helmet 30 str
+/customarmor plus dragon_helmet 20 con
+/customarmor effect dragon_helmet HEALTHREGEN 0.01
+```
+
+```bash Chestplate
+/customarmor create dragon_chestplate  
+/customarmor plus dragon_chestplate 50 str
+/customarmor plus dragon_chestplate 40 con
+/customarmor effect dragon_chestplate HEALTHREGEN 0.02
+```
+
+```bash Leggings
+/customarmor create dragon_leggings
+/customarmor plus dragon_leggings 35 dex
+/customarmor plus dragon_leggings 25 con
+```
+
+```bash Boots
+/customarmor create dragon_boots
+/customarmor plus dragon_boots 25 dex
+/customarmor percentage dragon_boots 0.10 dex
+```
+</CodeGroup>
+
+## Managing Custom Items
+
+### Viewing Item Information
+
+Check the stats and effects of the item in your hand:
+
+```bash
+/ci info
+```
+
+This displays:
+- Item ID
+- Display name
+- Material type
+- Number of lore lines
+- All stats with their operations
+- All active effects
+
+### Listing All Items
+
+View all registered custom items:
+
+```bash
+/ci list [page]
+```
+
+### Modifying Items
+
+<Accordion title="Update item name">
+  ```bash
+  /ci rename §6§lNew Name Here
+  ```
+</Accordion>
+
+<Accordion title="Add lore line">
+  ```bash
+  /ci addline §7This is a new lore line
+  ```
+</Accordion>
+
+<Accordion title="Edit specific lore line">
+  ```bash
+  /ci setline <line_number> <new_text>
+  # Example:
+  /ci setline 2 §eUpdated second line
+  ```
+</Accordion>
+
+<Accordion title="Delete an item">
+  ```bash
+  /ci delete <item_id>
+  ```
+  
+  <Warning>
+    This only unregisters the item. Existing items in player inventories will become non-functional.
+  </Warning>
+</Accordion>
+
+## Programmatic Item Creation
+
+### Using the API
+
+Create custom items programmatically:
+
+```java
+import org.debentialc.customitems.commands.CustomItemCommand;
+import org.debentialc.customitems.tools.ci.CustomItem;
+import org.debentialc.customitems.tools.storage.CustomItemStorage;
+
+// Create a new custom item
+CustomItem item = new CustomItem()
+    .setId("legendary_blade")
+    .setMaterial(Material.DIAMOND_SWORD.getId())
+    .setDisplayName("§6§lLegendary Blade")
+    .setLore(Arrays.asList(
+        "§7Forged in dragon fire",
+        "§e+100 Strength",
+        "§a2% Health Regeneration"
+    ));
+
+// Add stats with operations
+item.setOperation("+", "str").setBonusStat("str", 100.0);
+item.setOperation("+", "dex").setBonusStat("dex", 50.0);
+
+// Add effects
+item.getEffects().put("HEALTHREGEN", 0.02);
+
+// Register and save
+CustomItemCommand.items.put("legendary_blade", item);
+CustomItemStorage storage = new CustomItemStorage();
+storage.saveItem(item);
+```
+
+### Giving Items Programmatically
+
+```java
+Player player = Bukkit.getPlayer("PlayerName");
+if (player != null) {
+    CustomItemCommand itemCmd = new CustomItemCommand();
+    CustomItem customItem = CustomItemCommand.items.get("legendary_blade");
+    
+    if (customItem != null) {
+        ItemStack itemStack = itemCmd.toItemStack(customItem);
+        itemStack.setAmount(1);
+        player.getInventory().addItem(itemStack);
+    }
+}
+```
+
+## How Stats Are Applied
+
+Custom item stats are automatically applied when:
+
+1. **Armor is equipped** - Stats from all armor pieces stack
+2. **Item is held in hand** - Weapon/tool stats apply when held
+3. **Effects run continuously** - Regeneration effects tick while equipped/held
+
+From the source code:
+
+```java CustomManager.java:224-272
+public static void armorTask() {
+    BukkitRunnable runnable = new BukkitRunnable() {
+        @Override
+        public void run() {
+            for (Player player : Main.instance.getServer().getOnlinePlayers()) {
+                // Calculate which items are currently equipped/held
+                Set<String> currentItemIds = new HashSet<>();
+                
+                // Check all armor slots
+                for (ItemStack armorContent : player.getInventory().getArmorContents()) {
+                    if (armorContent == null) continue;
+                    if (registerItem.isCustom(armorContent)) {
+                        CustomArmor ci = registerItem.toItemCustom(armorContent);
+                        if (ci != null) {
+                            currentItemIds.add(ci.getId());
+                        }
+                    }
+                }
+                
+                // Check item in hand
+                ItemStack itemInHand = player.getItemInHand();
+                if (itemInHand != null) {
+                    if (itemCmd.isCustom(itemInHand)) {
+                        CustomItem ci = itemCmd.toItemCustom(itemInHand);
+                        if (ci != null && ci.isActive()) {
+                            currentItemIds.add(ci.getId());
+                        }
+                    }
+                }
+                
+                // Remove bonuses from unequipped items
+                if (playerArmorBonus.containsKey(player.getUniqueId())) {
+                    Set<String> activeBonus = new HashSet<>(playerArmorBonus.get(player.getUniqueId()));
+                    for (String bonus : activeBonus) {
+                        if (!currentItemIds.contains(bonus)) {
+                            removeBonusFromPlayer(player, bonus);
+                        }
+                    }
+                }
+                
+                // Apply current bonuses
+                applyArmorBonus(player);
+                applyHandItemBonus(player);
+            }
+        }
+    };
+    runnable.runTaskTimer(Main.instance, 20L, 20L);
+}
+```
+
+<Note>
+  Stats are checked every second (20 ticks) and automatically update when players equip/unequip items.
+</Note>
+
+## Item Fragments
+
+Fragments are special upgrade materials that can be applied to armor for additional bonuses.
+
+### Fragment Commands
+
+```bash
+/fragment give <player> <tier> <amount>
+/fragment tier <material> <tier>  # Set tier level
+/fragmentadmin <options>          # Admin management
+```
+
+## Complete Item Example
+
+Here's a complete workflow for creating a legendary item:
+
+<Steps>
+  <Step title="Create base item">
+    ```bash
+    # Hold a diamond sword, then:
+    /ci rename §6§l⚡ Thunderfang ⚡
+    /ci addline §7Channels the power of storms
+    /ci addline §8
+    /ci addline §e+100 Strength
+    /ci addline §e+50 Dexterity  
+    /ci addline §a+15% Strength Multiplier
+    /ci addline §b2% Ki Regeneration
+    /ci addline §8
+    /ci addline §5§lLEGENDARY WEAPON
+    ```
+  </Step>
+  
+  <Step title="Register item">
+    ```bash
+    /ci create thunderfang
+    ```
+  </Step>
+  
+  <Step title="Apply stats">
+    ```bash
+    /ci plus thunderfang 100 str
+    /ci plus thunderfang 50 dex
+    /ci percentage thunderfang 0.15 str
+    ```
+  </Step>
+  
+  <Step title="Add effects">
+    ```bash
+    /ci effect KIREGEN 0.02
+    ```
+  </Step>
+  
+  <Step title="Distribute">
+    ```bash
+    /ci give thunderfang Steve 1
+    ```
+  </Step>
+</Steps>
+
+## Storage and Persistence
+
+Custom items are automatically saved to:
+```
+plugins/Debentialc/data/items/
+plugins/Debentialc/data/armor/
+```
+
+Data persists across server restarts and is loaded automatically on plugin enable.
+
+## Permissions
+
+| Command | Permission |
+|---------|------------|
+| `/ci create` | `dbcplugin.command.ci` |
+| `/ci give` | `dbcplugin.command.ci` |
+| `/ci delete` | `dbcplugin.command.ci` |
+| All other `/ci` | `dbcplugin.command.ci` |
+
+## Best Practices
+
+<Steps>
+  <Step title="Balance testing">
+    Test item stats in a controlled environment before distribution. High multipliers can break game balance.
+  </Step>
+  
+  <Step title="Clear descriptions">
+    Use lore to clearly communicate what stats/effects an item provides.
+  </Step>
+  
+  <Step title="Unique IDs">
+    Use descriptive, unique IDs for items to avoid conflicts (e.g., `legendary_sword_fire` not `sword1`).
+  </Step>
+  
+  <Step title="Visual consistency">
+    Establish a color scheme for item rarities (§f = Common, §a = Uncommon, §9 = Rare, §5 = Legendary).
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="Stats not applying">
+  - Verify the item is properly registered with `/ci list`
+  - Check item is being held/worn by the player
+  - Confirm DBC plugin is loaded and functioning
+  - Use `/ci info` while holding the item to verify stats
+</Accordion>
+
+<Accordion title="Effects not working">
+  - Effects only work with DBC installed
+  - Check spelling: must be exactly `HEALTHREGEN`, `KIREGEN`, or `STAMINAREGEN`
+  - Effects apply every 5 ticks (0.25 seconds) when worn/held
+</Accordion>
+
+<Accordion title="Item lost after server restart">
+  - Items should save automatically
+  - Check file permissions in `plugins/Debentialc/data/`
+  - Verify CustomItemStorage is initialized in Main class
+</Accordion>

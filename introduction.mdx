@@ -1,0 +1,284 @@
+---
+title: Introduction to Debentialc
+description: A comprehensive Minecraft plugin framework featuring Boosters, Custom Items, Raids, and Territory Claims
+---
+
+# Introduction to Debentialc
+
+Debentialc is a powerful, feature-rich Minecraft plugin framework designed for Bukkit/Spigot servers running Java 8 or higher. Developed by DelawareX, this plugin provides four major integrated systems that enhance gameplay mechanics and server management.
+
+## What is Debentialc?
+
+Debentialc v1.1.5 is an all-in-one plugin solution that combines multiple gameplay systems into a single cohesive framework. It's built with performance and flexibility in mind, featuring:
+
+- **JavaScript-powered scripting** via Mozilla Rhino 1.7.14
+- **Modular architecture** with four independent systems
+- **Extensive API integration** with PlaceholderAPI, Vault, and CustomNPCs
+- **Persistent data storage** with JSON-based configuration
+
+## Core Systems
+
+<CardGroup cols={2}>
+  <Card title="Boosters" icon="gauge-high" href="#booster-system">
+    Global and personal multiplier system with time-based activation and rank integration
+  </Card>
+  <Card title="Custom Items" icon="wand-sparkles" href="#custom-items-system">
+    Create items with custom stats, effects, and bonuses including fragment-based armor sets
+  </Card>
+  <Card title="Raids" icon="shield" href="#raid-system">
+    Configure NPC-based raid encounters with party management and rewards
+  </Card>
+  <Card title="Territory Claims" icon="flag" href="#claims-system">
+    Player-owned territories with lease mechanics and customizable protections
+  </Card>
+</CardGroup>
+
+## Booster System
+
+The booster module provides a sophisticated multiplier system for server-wide events and personal player bonuses.
+
+### Features
+
+- **Global Boosters**: Server-wide multipliers activated by admins
+- **Personal Boosters**: Individual player boosts with 5 configurable levels
+- **Rank Multipliers**: Permission-based bonus multipliers
+- **PlaceholderAPI Integration**: Real-time booster status in scoreboards/chat
+- **Persistent Storage**: Auto-save and auto-load system
+
+### Code Example: Checking Active Boosters
+
+```java
+import org.debentialc.boosters.managers.GlobalBoosterManager;
+import org.debentialc.boosters.managers.PersonalBoosterManager;
+import org.debentialc.boosters.core.BoosterUtils;
+import org.bukkit.entity.Player;
+
+public void checkBoosterStatus(Player player) {
+    // Get global multiplier
+    double globalMult = GlobalBoosterManager.getCurrentMultiplier();
+    
+    // Get personal multiplier
+    double personalMult = PersonalBoosterManager.getActiveMultiplier(player.getUniqueId());
+    
+    // Calculate combined multiplier
+    double combined = BoosterUtils.calculateCombinedMultiplier(player.getUniqueId());
+    
+    player.sendMessage("Global: " + BoosterUtils.formatMultiplier(globalMult));
+    player.sendMessage("Combined: " + BoosterUtils.formatMultiplier(combined));
+}
+```
+
+See Main.java:156-183
+
+## Custom Items System
+
+Create and manage custom items with stat bonuses, special effects, and fragment-based equipment.
+
+### Features
+
+- **Stat Bonuses**: Additive (+), subtractive (-), and multiplicative (*) operations
+- **Special Effects**: HEALTHREGEN, KIREGEN, STAMINAREGEN
+- **Fragment System**: Collectible armor fragments with bonus integration
+- **Custom Armor**: Equipment with visual customization
+- **DBC Integration**: Race and class-specific stat multipliers
+
+### Supported Stats
+
+- `str` - Strength
+- `con` - Constitution  
+- `dex` - Dexterity
+- `will` - Willpower
+- `mnd` - Mind
+
+### Code Example: Creating a Custom Item
+
+```java
+import org.debentialc.customitems.commands.CustomItemCommand;
+import org.bukkit.entity.Player;
+
+// Create item from held item
+// /ci create sword_of_power
+
+// Add stat bonuses programmatically
+CustomItem item = new CustomItem()
+    .setId("legendary_sword")
+    .setMaterial(276) // Diamond Sword
+    .setDisplayName("§6§lLegendary Sword")
+    .setOperation("+", "str")
+    .setBonusStat("str", 50.0)
+    .setOperation("*", "dex")
+    .setBonusStat("dex", 1.25); // 25% multiplier
+```
+
+See CustomItemCommand.java:201-229
+
+## Raid System
+
+Create challenging NPC encounters with the CustomNPCs integration.
+
+### Features
+
+- **NPC-Based Encounters**: Integration with CustomNPCs API
+- **Party Management**: Group-based raid sessions
+- **Raid Sessions**: Active encounter tracking
+- **Cooldown Management**: Per-player and per-raid cooldowns
+- **Persistent Storage**: JSON-based raid configurations
+- **Effects & Titles**: Visual feedback during raids
+
+### How It Works
+
+The raid system hooks into CustomNPCs death events and manages encounters through the `NPCDeathListener`:
+
+```java
+// From Main.java:105-129
+if (!noppes.npcs.api.AbstractNpcAPI.IsAvailable()) {
+    getLogger().warning("[Raids] CustomNPCs not available");
+    return;
+}
+
+noppes.npcs.api.AbstractNpcAPI api = 
+    noppes.npcs.api.AbstractNpcAPI.Instance();
+api.events().register(new NPCDeathListener());
+```
+
+## Claims System
+
+Player-owned territories with economy integration and protection mechanics.
+
+### Features
+
+- **Terrain Creation**: Admin-defined purchasable areas
+- **Lease System**: Player-owned temporary claims
+- **Member Management**: Granular permission system (build, break, containers, all)
+- **Protection Listeners**: Block break/place, PvP, and container access control
+- **Vault Economy**: Purchase territories with in-game currency
+- **Visual Borders**: Sign markers and boundary indicators
+- **Environmental Effects**: Custom weather and potion effects per territory
+
+### Permission Roles
+
+- `BUILD` - Place blocks only
+- `BREAK` - Break blocks only  
+- `CONTAINERS` - Access chests/containers
+- `ALL` - Full permissions
+
+### Code Example: Territory Commands
+
+```bash
+# Admin creates a territory
+/terrain create downtown 4
+/terrain price downtown 50000
+/terrain commit downtown
+
+# Player purchases and manages
+/terrain info downtown
+/terrain member downtown PlayerName build
+/terrain transfer downtown NewOwner
+```
+
+See TerrainCommand.java:17-430
+
+## Dependencies
+
+Debentialc integrates with several optional plugins to enhance functionality:
+
+<CardGroup cols={3}>
+  <Card title="PlaceholderAPI" icon="percent">
+    **Optional**
+    
+    Enables booster placeholders in chat, scoreboards, and tab lists
+  </Card>
+  <Card title="Vault" icon="vault">
+    **Optional**
+    
+    Required for territory economy features and purchases
+  </Card>
+  <Card title="CustomNPCs" icon="robot">
+    **Optional**
+    
+    Required for the Raid system NPC event integration
+  </Card>
+</CardGroup>
+
+### Required Dependencies
+
+- **Rhino 1.7.14** - JavaScript engine (bundled with plugin)
+- **Bukkit/Spigot API** - Compatible with 1.8+
+- **Java 8+** - Minimum Java version required
+
+## Data Storage
+
+All plugin data is stored in `plugins/Debentialc/`:
+
+```
+plugins/Debentialc/
+├── data/
+│   ├── boosters/
+│   │   ├── global_boosters.json
+│   │   └── personal_boosters.json
+│   ├── raids/
+│   │   ├── raids.json
+│   │   ├── cooldowns.json
+│   │   └── system_data.json
+│   ├── claims/
+│   │   └── terrains.json
+│   └── customitems/
+│       └── items.json
+```
+
+See Main.java:39-43 for the initialization code.
+
+## Architecture
+
+Debentialc uses a modular initialization pattern:
+
+```java
+// From Main.java:48-82
+@Override
+public void onEnable() {
+    instance = this;
+    System.out.println("Plugin successfully enabled");
+    System.out.println("Version: 1.1.5");
+    System.out.println("By DelawareX");
+    
+    // Load commands by package
+    classesRegistration.loadCommands("org.debentialc.customitems.commands");
+    classesRegistration.loadCommands("org.debentialc.raids.commands");
+    classesRegistration.loadCommands("org.debentialc.boosters.commands");
+    classesRegistration.loadCommands("org.debentialc.claims.commands");
+    
+    // Load event listeners
+    classesRegistration.loadListeners("org.debentialc.customitems.events");
+    classesRegistration.loadListeners("org.debentialc.boosters.events");
+    classesRegistration.loadListeners("org.debentialc.raids.events");
+    classesRegistration.loadListeners("org.debentialc.claims.events");
+    
+    // Initialize modules
+    BoosterModule.initialize(this);
+    PlaceholderModule.initialize(this);
+    ClaimsModule.initialize(this);
+    
+    // Register CustomNPCs integration
+    registerCustomNPCsEvents();
+    
+    // Load raid data
+    RaidStorageManager.loadAllRaids();
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Learn how to install Debentialc and configure dependencies
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Configure each module for your server's needs
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get started with basic commands and usage
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/commands/booster">
+    Integrate Debentialc into your own plugins
+  </Card>
+</CardGroup>
